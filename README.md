@@ -99,11 +99,3 @@ MONGODB_URI=... JWT_SECRET=... npm start       # Express serves the API and the 
 - **Cascade / Charity board:** listings carry a `bakery`, `dietaryTags`, `allergens`, `visibleToIndividuals`, `location` (GeoJSON, 2dsphere indexed) and a pickup window; verified charities are the users with `verification.status === 'approved'`.
 - **Impact dashboard:** listings are never hard-deleted or expired in the database. "Expired" is derived from `pickupEnd`.
 
-## Credits and AI usage
-
-- Libraries: Vue, vue-router, Pinia, Axios, Bootstrap, Bootstrap Icons, motion-v, Leaflet, Express, Mongoose, Multer, bcryptjs, jsonwebtoken, cookie-parser, Playwright (all free / open source).
-- Data and tiles: [OneMap](https://www.onemap.gov.sg/) search API and map tiles © Singapore Land Authority.
-- Statistic on the home page: National Environment Agency, [Waste statistics and overall recycling rate, CY2025 vs CY2024](https://www.nea.gov.sg/docs/default-source/default-document-library/annex-tables-and-charts.pdf).
-- **AI/LLM disclosure (required by the course):** the code for this work (home page, accounts, visibility rules, listing form, API routes, filters, map, countdown ring, tests, this README)
-  was generated with Claude (Anthropic) and then reviewed and run by the team. Update this section to say exactly which parts you wrote yourselves
-  and which relied on AI before submission.
