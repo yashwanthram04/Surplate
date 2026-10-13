@@ -21,7 +21,7 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm --prefix server start',
-      url: `http://localhost:${API_PORT}/api/demo/users`,
+      url: `http://localhost:${API_PORT}/api/stats`,
       env: { PORT: String(API_PORT), MONGODB_URI: '' },
       reuseExistingServer: false,
       timeout: 120_000,

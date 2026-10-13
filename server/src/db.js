@@ -5,16 +5,18 @@ import mongoose from 'mongoose';
  * Without it, outside production, it boots a throwaway in-memory MongoDB so the app and
  * the E2E tests run with zero setup. Returns an async `close()`.
  */
-export async function connectDb(uri = process.env.MONGODB_URI) {
+export async function connectDb({ uri = process.env.MONGODB_URI, forceMemory = false } = {}) {
   let memory = null;
   let usingMemory = false;
+  // forceMemory is for tests: they reset the data, so they must never touch a configured database.
+  if (forceMemory) uri = '';
   if (!uri) {
     if (process.env.NODE_ENV === 'production') throw new Error('MONGODB_URI must be set in production.');
     const { MongoMemoryServer } = await import('mongodb-memory-server');
     memory = await MongoMemoryServer.create();
     uri = memory.getUri('surplate');
     usingMemory = true;
-    console.log('No MONGODB_URI set: using a temporary in-memory MongoDB (data is lost on restart).');
+    if (!forceMemory) console.log('No MONGODB_URI set: using a temporary in-memory MongoDB (data is lost on restart).');
   }
   await mongoose.connect(uri);
   // Make sure the 2dsphere index exists before the first geo query.

@@ -23,7 +23,7 @@ const removing = ref(false);
 const removeError = ref('');
 const flash = ref(route.query.posted ? 'Your listing is live on the board.' : route.query.updated ? 'Your changes have been saved.' : '');
 
-const isOwner = computed(() => !!listing.value && session.userId === listing.value.bakery.id);
+const isOwner = computed(() => !!listing.value && session.user?.id === listing.value.bakery.id);
 // Derived from the shared clock so the page flips to "closed" the moment the window ends.
 const ended = computed(() => !!listing.value && new Date(listing.value.pickupEnd).getTime() < now.value);
 const upcoming = computed(() => !!listing.value && new Date(listing.value.pickupStart).getTime() > now.value);
@@ -60,7 +60,7 @@ async function remove() {
 
 <template>
   <div class="mx-auto" style="max-width: 1100px">
-    <RouterLink to="/" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All listings</RouterLink>
+    <RouterLink to="/browse" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All listings</RouterLink>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
 
@@ -68,7 +68,7 @@ async function remove() {
       <div class="display-5 mb-2">🥖</div>
       <h1 class="h4">This listing is no longer available</h1>
       <p class="text-body-secondary">It may have been removed by the bakery.</p>
-      <RouterLink to="/" class="btn btn-primary">Browse available food</RouterLink>
+      <RouterLink to="/browse" class="btn btn-primary">Browse available food</RouterLink>
     </div>
 
     <div v-else-if="error" class="alert alert-danger mt-3" role="alert">{{ error }} <button class="btn btn-sm btn-outline-danger ms-2" @click="load">Retry</button></div>
@@ -103,6 +103,7 @@ async function remove() {
             <div v-else-if="upcoming" class="alert alert-info mt-3 mb-0 py-2" role="status">Pickup opens {{ formatDateTime(listing.pickupStart) }}.</div>
 
             <div class="d-flex flex-wrap gap-1 mt-3">
+              <span v-if="!listing.visibleToIndividuals" class="tag-pill charity-pill" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> Charities only</span>
               <span v-for="t in listing.dietaryTags" :key="t" class="tag-pill">{{ t }}</span>
               <span v-if="!listing.dietaryTags.length" class="small text-body-secondary">No dietary tags</span>
             </div>
@@ -111,6 +112,10 @@ async function remove() {
                 <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i><strong>Contains:</strong> {{ listing.allergens.join(', ') }}
               </template>
               <template v-else>No declared allergens. Ask the bakery if you have a severe allergy.</template>
+            </div>
+
+            <div v-if="isOwner && !listing.visibleToIndividuals" class="small text-body-secondary mt-3" data-testid="owner-visibility-note">
+              Only verified charities can see this listing. Edit it to share it with individuals too.
             </div>
 
             <dl class="row mt-3 mb-0 small">

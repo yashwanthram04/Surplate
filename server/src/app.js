@@ -1,22 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import { attachUser } from './middleware/auth.js';
-import demoRoutes from './routes/demo.js';
+import adminRoutes from './routes/admin.js';
+import authRoutes from './routes/auth.js';
 import geocodeRoutes from './routes/geocode.js';
 import listingRoutes from './routes/listings.js';
+import statsRoutes from './routes/stats.js';
 
 const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 
 export function createApp() {
   const app = express();
   app.use(express.json());
+  app.use(cookieParser());
   app.use('/api', attachUser);
 
-  app.use('/api/demo', demoRoutes);
+  app.use('/api/auth', authRoutes);
+  app.use('/api/admin', adminRoutes);
   app.use('/api/geocode', geocodeRoutes);
   app.use('/api/listings', listingRoutes);
+  app.use('/api/stats', statsRoutes);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
   // In production the built Vue app is served from the same server (index.html at the root).

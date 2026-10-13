@@ -5,6 +5,7 @@ import Listing, { ALLERGENS, DIETARY_TAGS } from '../models/Listing.js';
 import { requireBakery } from '../middleware/auth.js';
 import { MAX_PHOTO_BYTES, checkPhoto, parseListingInput, toList } from '../utils/validate.js';
 import { toListingDTO } from '../utils/serialize.js';
+import { canView, visibilityFilter } from '../utils/visibility.js';
 
 const router = Router();
 const ENDING_SOON_MS = 2 * 60 * 60 * 1000; // keep in sync with client/src/constants.js
@@ -41,7 +42,7 @@ async function loadOwned(req, res, next) {
 //   &lat=&lng=&radiusKm=  &sort=ending|distance|newest
 router.get('/', async (req, res) => {
   const now = new Date();
-  const filter = { status: 'active', pickupEnd: { $gt: now }, quantityRemaining: { $gt: 0 } };
+  const filter = { status: 'active', pickupEnd: { $gt: now }, quantityRemaining: { $gt: 0 }, ...visibilityFilter(req.user) };
 
   const dietary = toList(req.query.dietary).filter((t) => DIETARY_TAGS.includes(t));
   if (dietary.length) filter.dietaryTags = { $all: dietary };
@@ -93,8 +94,8 @@ router.get('/mine', requireBakery, async (req, res) => {
 
 // GET /api/listings/:id/photo
 router.get('/:id/photo', async (req, res) => {
-  const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('photo');
-  if (!doc?.photo?.data) return res.status(404).end();
+  const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('photo bakery visibleToIndividuals');
+  if (!doc?.photo?.data || !canView(doc, req.user)) return res.status(404).end();
   res.set({
     'Content-Type': doc.photo.contentType,
     'Cache-Control': 'public, max-age=31536000, immutable', // the ?v= query changes when the photo does
@@ -107,7 +108,7 @@ router.get('/:id/photo', async (req, res) => {
 // GET /api/listings/:id – ended listings stay viewable (shared links) but are flagged phase: 'ended'.
 router.get('/:id', async (req, res) => {
   const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('-photo.data');
-  if (!doc) return res.status(404).json({ error: 'Listing not found.' });
+  if (!doc || !canView(doc, req.user)) return res.status(404).json({ error: 'Listing not found.' });
   res.json(toListingDTO(doc));
 });
 
@@ -174,6 +175,7 @@ router.post('/:id/repost', requireBakery, loadOwned, async (req, res) => {
     allergens: source.allergens,
     address: source.address,
     postal: source.postal,
+    visibleToIndividuals: source.visibleToIndividuals,
     lat: source.location.coordinates[1],
     lng: source.location.coordinates[0],
     // ...only stock and times are re-entered

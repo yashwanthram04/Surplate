@@ -1,11 +1,14 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import { now } from '../composables/useNow';
 import ListingCard from '../components/ListingCard.vue';
 import ListingFilters from '../components/ListingFilters.vue';
 import ListingMap from '../components/ListingMap.vue';
+import { useSession } from '../stores/session';
 
+const session = useSession();
 const filters = ref({ q: '', dietary: [], avoid: [], openNow: false, endingSoon: false, near: null, radiusKm: 5, sort: 'ending' });
 const items = ref([]);
 const loading = ref(true);
@@ -63,6 +66,13 @@ onBeforeUnmount(() => {
     <div class="col-12">
       <h1 class="h3 mb-1">Rescue surplus food</h1>
       <p class="text-body-secondary mb-0">Fresh leftovers from local bakeries, free to collect before the pickup window closes.</p>
+      <!-- Charities-only listings are hidden from everyone except verified charities, so say so instead of leaving people guessing -->
+      <div v-if="!session.hasFullAccess" class="small text-body-secondary mt-2" data-testid="partial-view-note">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        You're seeing the listings bakeries share with everyone. Verified charities see more.
+        <template v-if="session.isCharity">Your charity is awaiting verification.</template>
+        <RouterLink v-else-if="!session.isLoggedIn" to="/register?role=charity">Register a charity</RouterLink>
+      </div>
     </div>
 
     <!-- List / map toggle for small screens -->

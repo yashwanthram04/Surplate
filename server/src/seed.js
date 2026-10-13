@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { connectDb } from './db.js';
 import Listing from './models/Listing.js';
@@ -6,21 +6,29 @@ import User from './models/User.js';
 
 const MIN = 60 * 1000;
 
-// Fixed ids so the client's remembered "acting as" user survives a server restart.
+// Fixed ids so tests and docs can refer to the demo accounts.
 const id = (n) => new mongoose.Types.ObjectId(`64b00000000000000000000${n}`);
-export const DEMO_USERS = [
-  { _id: id(1), name: 'Sunrise Bakery', email: 'sunrise@demo.surplate.sg', role: 'bakery' },
-  { _id: id(2), name: 'Crumb & Co', email: 'crumb@demo.surplate.sg', role: 'bakery' },
-  { _id: id(3), name: 'Golden Loaf Bakery', email: 'goldenloaf@demo.surplate.sg', role: 'bakery' },
-  { _id: id(4), name: 'Hope Kitchen (charity)', email: 'hope@demo.surplate.sg', role: 'charity' },
-  { _id: id(5), name: 'Alex Tan', email: 'alex@demo.surplate.sg', role: 'individual' },
-];
+// All demo accounts share this password. It is documented in the README on purpose (the course
+// requires dummy logins), so never seed these into a real deployment.
+export const DEMO_PASSWORD = 'demo1234';
 
 const SITES = {
   sunrise: { address: '56 ENG HOON STREET', postal: '160056', lat: 1.2851, lng: 103.8317 }, // Tiong Bahru
   crumb: { address: '200 VICTORIA STREET BUGIS JUNCTION', postal: '188021', lat: 1.2999, lng: 103.8553 }, // Bugis
   golden: { address: '4 TAMPINES CENTRAL 5 TAMPINES MALL', postal: '529510', lat: 1.3527, lng: 103.9449 }, // Tampines
 };
+const approved = { status: 'approved', reviewedAt: new Date() };
+
+export const DEMO_USERS = [
+  { _id: id(1), name: 'Sunrise Bakery', email: 'sunrise@demo.surplate.sg', role: 'bakery', ...SITES.sunrise },
+  { _id: id(2), name: 'Crumb & Co', email: 'crumb@demo.surplate.sg', role: 'bakery', ...SITES.crumb },
+  { _id: id(3), name: 'Golden Loaf Bakery', email: 'goldenloaf@demo.surplate.sg', role: 'bakery', ...SITES.golden },
+  { _id: id(4), name: 'Hope Kitchen', email: 'hope@demo.surplate.sg', role: 'charity', registrationNo: 'DEMO-CHARITY-001', verification: approved },
+  { _id: id(5), name: 'Alex Tan', email: 'alex@demo.surplate.sg', role: 'individual' },
+  // Waiting in the admin's verification queue
+  { _id: id(6), name: 'New Hope Shelter', email: 'newhope@demo.surplate.sg', role: 'charity', registrationNo: 'DEMO-CHARITY-002', verification: { status: 'pending' } },
+  { _id: id(7), name: 'Surplate Admin', email: 'admin@demo.surplate.sg', role: 'admin' },
+];
 
 /** A simple generated placeholder so seeded listings have a photo. */
 function placeholderPhoto(emoji, from, to) {
@@ -45,42 +53,42 @@ function demoListings(now) {
   const [sunrise, crumb, golden] = DEMO_USERS;
   return [
     row(sunrise, SITES.sunrise, {
-      itemName: 'Assorted croissants', description: 'Butter and almond croissants baked this morning.',
+      itemName: 'Assorted croissants', visibleToIndividuals: true, description: 'Butter and almond croissants baked this morning.',
       quantity: 12, dietaryTags: ['vegetarian'], allergens: ['gluten', 'dairy', 'eggs', 'nuts'],
       pickupStart: t(-20), pickupEnd: t(90), bestBefore: t(8 * 60), photo: ['🥐', '#fde68a', '#f59e0b'],
     }),
     row(sunrise, SITES.sunrise, {
-      itemName: 'Sourdough loaves', description: 'Whole loaves, unsliced.',
+      itemName: 'Sourdough loaves', visibleToIndividuals: false, description: 'Whole loaves, unsliced.',
       quantity: 6, dietaryTags: ['vegan', 'vegetarian'], allergens: ['gluten'],
       pickupStart: t(-10), pickupEnd: t(240), bestBefore: t(24 * 60), photo: ['🍞', '#fed7aa', '#c2410c'],
     }),
     row(sunrise, SITES.sunrise, {
-      itemName: 'Kaya toast sets', description: 'Left over from the breakfast rush.',
+      itemName: 'Kaya toast sets', visibleToIndividuals: true, description: 'Left over from the breakfast rush.',
       quantity: 10, quantityRemaining: 0, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
       pickupStart: t(-180), pickupEnd: t(-60), bestBefore: t(-30), photo: ['🍞', '#d9f99d', '#65a30d'],
     }),
     row(crumb, SITES.crumb, {
-      itemName: 'Chocolate muffins', description: 'Double chocolate, packed in boxes of 4.',
+      itemName: 'Chocolate muffins', visibleToIndividuals: false, description: 'Double chocolate, packed in boxes of 4.',
       quantity: 20, dietaryTags: ['vegetarian'], allergens: ['gluten', 'dairy', 'eggs', 'soy'],
       pickupStart: t(45), pickupEnd: t(180), bestBefore: t(24 * 60), photo: ['🧁', '#fbcfe8', '#be185d'],
     }),
     row(crumb, SITES.crumb, {
-      itemName: 'Vegan banana bread', description: 'Sliced loaf, individually wrapped.',
+      itemName: 'Vegan banana bread', visibleToIndividuals: true, description: 'Sliced loaf, individually wrapped.',
       quantity: 15, dietaryTags: ['vegan', 'vegetarian', 'dairy-free', 'egg-free'], allergens: ['gluten', 'nuts'],
       pickupStart: t(-5), pickupEnd: t(300), bestBefore: t(48 * 60), photo: ['🍌', '#fef08a', '#a16207'],
     }),
     row(crumb, SITES.crumb, {
-      itemName: 'Egg tarts', description: 'Classic Portuguese-style egg tarts.',
+      itemName: 'Egg tarts', visibleToIndividuals: true, description: 'Classic Portuguese-style egg tarts.',
       quantity: 18, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
       pickupStart: t(-15), pickupEnd: t(150), bestBefore: t(12 * 60), photo: ['🥧', '#fde68a', '#d97706'],
     }),
     row(golden, SITES.golden, {
-      itemName: 'Pandan buns', description: 'Soft pandan buns with coconut filling.',
+      itemName: 'Pandan buns', visibleToIndividuals: true, description: 'Soft pandan buns with coconut filling.',
       quantity: 30, dietaryTags: ['halal', 'vegetarian'], allergens: ['gluten', 'eggs'],
       pickupStart: t(-60), pickupEnd: t(360), bestBefore: t(24 * 60), photo: ['🥯', '#bbf7d0', '#15803d'],
     }),
     row(golden, SITES.golden, {
-      itemName: 'Curry puffs', description: 'Chicken curry puffs, halal-certified.',
+      itemName: 'Curry puffs', visibleToIndividuals: false, description: 'Chicken curry puffs, halal-certified.',
       quantity: 24, dietaryTags: ['halal', 'dairy-free'], allergens: ['gluten', 'eggs'],
       pickupStart: t(0), pickupEnd: t(75), bestBefore: t(10 * 60), photo: ['🥟', '#fed7aa', '#ea580c'],
     }),
@@ -95,9 +103,10 @@ export async function seedDemoData({ reset = false } = {}) {
     console.log('Database already has users, skipping seed (use `npm run seed:reset` to start over).');
     return;
   }
-  await User.insertMany(DEMO_USERS);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  await User.insertMany(DEMO_USERS.map((u) => ({ ...u, passwordHash })));
   await Listing.insertMany(demoListings(Date.now()));
-  console.log(`Seeded ${DEMO_USERS.length} demo users and 8 demo listings.`);
+  console.log(`Seeded ${DEMO_USERS.length} demo users (password: ${DEMO_PASSWORD}) and 8 demo listings.`);
 }
 
 // `npm run seed` / `npm run seed:reset`
@@ -107,6 +116,7 @@ if (process.argv[1]?.endsWith('seed.js')) {
     console.error('Refusing to seed when NODE_ENV=production.');
     process.exit(1);
   }
+  await import('dotenv/config'); // only the CLI reads server/.env; importing this file (e.g. from tests) never does
   if (!process.env.MONGODB_URI) {
     console.error('Set MONGODB_URI in server/.env first. (Without it the app seeds its own in-memory DB on start.)');
     process.exit(1);

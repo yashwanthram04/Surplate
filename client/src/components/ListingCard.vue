@@ -37,6 +37,7 @@ defineEmits(['hover']);
       </div>
 
       <div class="d-flex flex-wrap gap-1 mb-2">
+        <span v-if="!listing.visibleToIndividuals" class="tag-pill charity-pill" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> Charities only</span>
         <span v-for="t in listing.dietaryTags" :key="t" class="tag-pill">{{ t }}</span>
       </div>
       <div v-if="listing.allergens.length" class="allergen-text mb-2">

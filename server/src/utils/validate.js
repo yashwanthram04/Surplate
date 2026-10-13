@@ -4,6 +4,8 @@ const MAX_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 // Rough bounding box of Singapore; rejects coordinates that clearly aren't from OneMap.
 const SG = { minLat: 1.15, maxLat: 1.48, minLng: 103.6, maxLng: 104.1 };
+export const isInSingapore = (lat, lng) =>
+  Number.isFinite(lat) && Number.isFinite(lng) && lat >= SG.minLat && lat <= SG.maxLat && lng >= SG.minLng && lng <= SG.maxLng;
 
 export const toList = (v) => (Array.isArray(v) ? v : typeof v === 'string' && v ? v.split(',') : []).filter((x) => typeof x === 'string').map((x) => x.trim());
 
@@ -55,6 +57,9 @@ export function parseListingInput(body = {}, now = new Date()) {
   }
   Object.assign(value, { pickupStart, pickupEnd, bestBefore });
 
+  // multipart forms send "true"/"false"; JSON sends a boolean
+  value.visibleToIndividuals = body.visibleToIndividuals === true || body.visibleToIndividuals === 'true';
+
   const address = typeof body.address === 'string' ? body.address.trim() : '';
   if (!address || address.length > 200) errors.address = 'Choose a pickup address from the search results.';
   value.address = address;
@@ -62,8 +67,7 @@ export function parseListingInput(body = {}, now = new Date()) {
 
   const lat = Number(body.lat);
   const lng = Number(body.lng);
-  const inSG = lat >= SG.minLat && lat <= SG.maxLat && lng >= SG.minLng && lng <= SG.maxLng;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inSG) {
+  if (!isInSingapore(lat, lng)) {
     errors.address = errors.address || 'Choose a pickup address from the search results.';
   }
   value.location = { type: 'Point', coordinates: [lng, lat] };

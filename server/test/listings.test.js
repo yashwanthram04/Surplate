@@ -1,24 +1,20 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { createApp } from '../src/app.js';
-import { connectDb } from '../src/db.js';
-import { DEMO_USERS, seedDemoData } from '../src/seed.js';
+import { boot } from './helpers.js';
 
-const [SUNRISE, CRUMB, , CHARITY] = DEMO_USERS.map((u) => String(u._id));
 // 1x1 transparent PNG
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
-let db, server, base;
+let ctx, base, SUNRISE, CRUMB, CHARITY;
 before(async () => {
-  db = await connectDb(process.env.TEST_MONGODB_URI || undefined);
-  await seedDemoData({ reset: true });
-  server = createApp().listen(0);
-  base = `http://localhost:${server.address().port}/api`;
+  ctx = await boot();
+  base = ctx.base;
+  // cookie strings for three logged-in demo users
+  SUNRISE = await ctx.login('sunrise@demo.surplate.sg');
+  CRUMB = await ctx.login('crumb@demo.surplate.sg');
+  CHARITY = await ctx.login('hope@demo.surplate.sg');
 });
-after(async () => {
-  server?.close();
-  await db?.close();
-});
+after(() => ctx?.close());
 
 const inHours = (h) => new Date(Date.now() + h * 3600 * 1000).toISOString();
 const validFields = (over = {}) => ({
@@ -32,9 +28,10 @@ function form(fields, { photo = PNG } = {}) {
   if (photo) fd.append('photo', new Blob([photo], { type: 'image/png' }), 'p.png');
   return fd;
 }
-const call = (path, { user, ...init } = {}) => fetch(base + path, { ...init, headers: { ...(user ? { 'x-user-id': user } : {}), ...init.headers } });
+const call = (path, { user, ...init } = {}) => ctx.call(path, { ...init, as: user });
 const create = (fields, user = SUNRISE, opts) => call('/listings', { method: 'POST', user, body: form(fields, opts) });
-const names = async (qs) => (await (await call(`/listings?${qs}`)).json()).items.map((i) => i.itemName);
+// Board contents as a verified charity (who sees every listing); visibility rules have their own tests.
+const names = async (qs, as = CHARITY) => (await (await call(`/listings?${qs}`, { user: as })).json()).items.map((i) => i.itemName);
 
 describe('creating listings', () => {
   test('a bakery can post a listing with a photo, and it appears on the board', async () => {
@@ -44,7 +41,7 @@ describe('creating listings', () => {
     assert.equal(listing.quantityRemaining, 5);
     assert.equal(listing.bakery.name, 'Sunrise Bakery');
     assert.ok((await names('')).includes('Create-me rolls'));
-    const photo = await call(listing.photoUrl.replace('/api', ''));
+    const photo = await call(listing.photoUrl.replace('/api', ''), { user: SUNRISE }); // new listings are charities-only by default
     assert.equal(photo.headers.get('content-type'), 'image/png');
   });
 
@@ -106,7 +103,7 @@ describe('browsing and expiry', () => {
   });
 
   test('distance filter returns nearest-first within the radius', async () => {
-    const res = await (await call('/listings?lat=1.2999&lng=103.8553&radiusKm=2')).json();
+    const res = await (await call('/listings?lat=1.2999&lng=103.8553&radiusKm=2', { user: CHARITY })).json();
     assert.ok(res.items.length > 0);
     assert.ok(res.items.every((i) => i.distanceKm <= 2));
     assert.deepEqual(res.items.map((i) => i.distanceKm), res.items.map((i) => i.distanceKm).sort((a, b) => a - b));
@@ -181,5 +178,15 @@ describe('managing my listings', () => {
     const old = mine.items.find((i) => i.phase === 'ended');
     const res = await call(`/listings/${old.id}`, { method: 'PUT', user: SUNRISE, body: form(validFields(), { photo: null }) });
     assert.equal(res.status, 409);
+  });
+});
+
+describe('home page stats', () => {
+  test('counts only what is currently on the board', async () => {
+    const stats = await (await call('/stats')).json();
+    const board = (await (await call('/listings')).json()).items;
+    assert.equal(stats.listings, board.length);
+    assert.equal(stats.items, board.reduce((n, l) => n + l.quantityRemaining, 0));
+    assert.equal(stats.bakeries, new Set(board.map((l) => l.bakery.id)).size);
   });
 });

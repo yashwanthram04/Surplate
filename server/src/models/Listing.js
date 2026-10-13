@@ -37,6 +37,10 @@ const listingSchema = new mongoose.Schema(
     // Stored in MongoDB so the app works on hosts without a persistent disk.
     photo: { data: Buffer, contentType: String },
 
+    // false (the default): only verified charities see it. true: the bakery shares it with everyone.
+    // See utils/visibility.js for who can see what.
+    visibleToIndividuals: { type: Boolean, default: false },
+
     // Listings are never hard-deleted or expired in the DB: the impact dashboard and
     // reservation history need them. "Expired" is derived from pickupEnd at query time.
     status: { type: String, enum: ['active', 'removed'], default: 'active' },

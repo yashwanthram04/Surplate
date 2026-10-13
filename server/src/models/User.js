@@ -1,13 +1,31 @@
 import mongoose from 'mongoose';
 
-// Minimal user model, only what the listing feature needs (owner + display name).
-// TODO(Accounts & Impact Dashboard): replace/extend with the real account model
-// (password hash, charity verification, reliability score, ...).
+export const ROLES = ['bakery', 'charity', 'individual', 'admin'];
+export const SELF_SERVICE_ROLES = ['bakery', 'charity', 'individual']; // what people can register as; admins are seeded
+
 const userSchema = new mongoose.Schema(
   {
+    // Display name: the business name for a bakery, the organisation for a charity, the person's name otherwise.
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    role: { type: String, enum: ['bakery', 'charity', 'individual'], required: true },
+    passwordHash: { type: String, required: true, select: false }, // never returned unless asked for explicitly
+    role: { type: String, enum: ROLES, required: true },
+    phone: { type: String, default: '' },
+
+    // Charities only: the registration number the admin checks before approving.
+    registrationNo: { type: String, default: '' },
+    // Individuals and bakeries need no verification ('not_required'); charities start 'pending'.
+    verification: {
+      status: { type: String, enum: ['not_required', 'pending', 'approved', 'rejected'], default: 'not_required' },
+      note: { type: String, default: '' },
+      reviewedAt: Date,
+    },
+
+    // Bakeries: default pickup address, used to pre-fill the listing form.
+    address: { type: String, default: '' },
+    postal: { type: String, default: '' },
+    lat: Number,
+    lng: Number,
   },
   { timestamps: true }
 );

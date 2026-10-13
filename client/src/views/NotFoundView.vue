@@ -7,6 +7,6 @@ import { RouterLink } from 'vue-router';
     <div class="display-5 mb-2">🥖</div>
     <h1 class="h4">Page not found</h1>
     <p class="text-body-secondary">That page doesn't exist.</p>
-    <RouterLink to="/" class="btn btn-primary">Browse available food</RouterLink>
+    <RouterLink to="/browse" class="btn btn-primary">Browse available food</RouterLink>
   </div>
 </template>

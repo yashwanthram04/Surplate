@@ -3,7 +3,6 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
-import BakeryGate from '../components/BakeryGate.vue';
 import ListingMap from '../components/ListingMap.vue';
 import { ALLERGENS, DIETARY_TAGS, MAX_PHOTO_BYTES } from '../constants';
 import { useSession } from '../stores/session';
@@ -21,6 +20,7 @@ const form = reactive({
   quantity: '',
   dietaryTags: [],
   allergens: [],
+  visibleToIndividuals: false, // charities only, unless the bakery chooses to share
   pickupStart: toLocalInput(new Date()),
   pickupEnd: toLocalInput(minutesFromNow(120)),
   bestBefore: toLocalInput(minutesFromNow(360)),
@@ -58,6 +58,7 @@ async function loadExisting() {
       quantity: data.quantity,
       dietaryTags: [...data.dietaryTags],
       allergens: [...data.allergens],
+      visibleToIndividuals: data.visibleToIndividuals,
       pickupStart: toLocalInput(data.pickupStart),
       pickupEnd: toLocalInput(data.pickupEnd),
       bestBefore: toLocalInput(data.bestBefore),
@@ -68,14 +69,21 @@ async function loadExisting() {
     });
     pickedAddress.value = data.address;
     existingPhoto.value = data.photoUrl || '';
-    notOwner.value = data.bakery.id !== session.userId;
+    notOwner.value = data.bakery.id !== session.user?.id;
   } catch (err) {
     loadError.value = err.response?.status === 404 ? 'This listing no longer exists.' : errorMessage(err);
   } finally {
     loading.value = false;
   }
 }
-if (editing.value) loadExisting();
+if (editing.value) {
+  loadExisting();
+} else if (session.user?.lat != null) {
+  // New listing: start from the bakery's saved pickup address (they can still change it).
+  const u = session.user;
+  Object.assign(form, { address: u.address, postal: u.postal, lat: u.lat, lng: u.lng });
+  pickedAddress.value = u.address;
+}
 
 // ---- validation (mirrors server/src/utils/validate.js; the server stays the authority) ---
 const clientErrors = computed(() => {
@@ -164,6 +172,7 @@ async function submit() {
   fd.append('quantity', form.quantity);
   form.dietaryTags.forEach((t) => fd.append('dietaryTags', t));
   form.allergens.forEach((a) => fd.append('allergens', a));
+  fd.append('visibleToIndividuals', form.visibleToIndividuals);
   fd.append('pickupStart', fromLocalInput(form.pickupStart));
   fd.append('pickupEnd', fromLocalInput(form.pickupEnd));
   fd.append('bestBefore', fromLocalInput(form.bestBefore));
@@ -199,9 +208,8 @@ async function focusFirstError() {
 </script>
 
 <template>
-  <BakeryGate>
     <div class="mx-auto" style="max-width: 1100px">
-      <RouterLink :to="editing ? { name: 'listing', params: { id } } : '/'" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</RouterLink>
+      <RouterLink :to="editing ? { name: 'listing', params: { id } } : '/browse'" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</RouterLink>
       <h1 class="h3 mt-2">{{ editing ? 'Edit listing' : 'Post surplus food' }}</h1>
 
       <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
@@ -290,6 +298,18 @@ async function focusFirstError() {
             <div class="form-text">JPEG, PNG or WebP, up to 2 MB.<template v-if="editing"> Leave empty to keep the current photo.</template></div>
           </div>
 
+          <div class="bg-white border rounded-4 p-3 p-md-4 mb-4">
+            <div class="fw-semibold mb-2" id="who-label">Who can see this listing?</div>
+            <div class="form-check form-switch">
+              <input id="visibleToIndividuals" v-model="form.visibleToIndividuals" class="form-check-input" type="checkbox" role="switch" aria-describedby="who-help" data-testid="share-switch" />
+              <label class="form-check-label" for="visibleToIndividuals">Also show it to individuals</label>
+            </div>
+            <div id="who-help" class="form-text" data-testid="share-help">
+              <template v-if="form.visibleToIndividuals"><i class="bi bi-people-fill me-1" aria-hidden="true"></i>Everyone can see and reserve this listing.</template>
+              <template v-else><i class="bi bi-shield-check me-1" aria-hidden="true"></i>Only verified charities can see this listing. Turn this on to share it with everyone.</template>
+            </div>
+          </div>
+
           <div class="bg-white border rounded-4 p-3 p-md-4">
             <label for="address" class="form-label fw-semibold">Pickup address</label>
             <AddressSearch id="address" v-model="form.address" placeholder="Search an address or postal code" :invalid="!!err('address')" @select="onAddress" />
@@ -300,7 +320,7 @@ async function focusFirstError() {
         </div>
 
         <div class="col-12 d-flex gap-2 justify-content-end">
-          <RouterLink :to="editing ? { name: 'listing', params: { id } } : '/'" class="btn btn-outline-secondary">Cancel</RouterLink>
+          <RouterLink :to="editing ? { name: 'listing', params: { id } } : '/browse'" class="btn btn-outline-secondary">Cancel</RouterLink>
           <button type="submit" class="btn btn-primary px-4" :disabled="submitting" data-testid="submit-listing">
             <span v-if="submitting" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
             {{ editing ? 'Save changes' : 'Post listing' }}
@@ -308,5 +328,4 @@ async function focusFirstError() {
         </div>
       </form>
     </div>
-  </BakeryGate>
 </template>

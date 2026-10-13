@@ -1,8 +1,7 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
-import BakeryGate from '../components/BakeryGate.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import CountdownRing from '../components/CountdownRing.vue';
 import { now } from '../composables/useNow';
@@ -26,7 +25,6 @@ const past = computed(() => items.value.filter(isEnded));
 const shown = computed(() => (tab.value === 'active' ? active.value : past.value));
 
 async function load() {
-  if (!session.isBakery) return;
   loading.value = true;
   error.value = '';
   try {
@@ -39,8 +37,7 @@ async function load() {
     loading.value = false;
   }
 }
-// Reload when the demo account changes (or once the accounts have loaded).
-watch(() => [session.ready, session.userId], load, { immediate: true });
+load();
 if (route.query.removed) router.replace({ query: {} });
 
 // ---- remove ----------------------------------------------------------------------------
@@ -108,7 +105,6 @@ const badge = (l) => {
 </script>
 
 <template>
-  <BakeryGate>
     <div class="mx-auto" style="max-width: 1000px">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
@@ -159,6 +155,7 @@ const badge = (l) => {
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <RouterLink :to="{ name: 'listing', params: { id: l.id } }" class="fw-semibold text-decoration-none text-body">{{ l.itemName }}</RouterLink>
                 <span class="badge" :class="badge(l).cls">{{ badge(l).text }}</span>
+                <span v-if="!l.visibleToIndividuals" class="badge text-bg-light border" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> Charities only</span>
               </div>
               <div class="small text-body-secondary">{{ formatWindow(l.pickupStart, l.pickupEnd) }}</div>
               <div class="small"><strong>{{ l.quantityRemaining }}</strong> of {{ l.quantity }} left</div>
@@ -203,5 +200,4 @@ const badge = (l) => {
         </form>
       </ConfirmModal>
     </div>
-  </BakeryGate>
 </template>

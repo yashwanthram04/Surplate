@@ -1,19 +1,20 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test.js';
 
 const PHOTO = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'croissant.png');
 
-// Seeded demo accounts (server/src/seed.js) have fixed ids.
-const USERS = {
-  sunrise: '64b000000000000000000001',
-  crumb: '64b000000000000000000002',
-  charity: '64b000000000000000000004',
+// Seeded demo accounts (server/src/seed.js); every one uses the password below.
+const EMAILS = {
+  sunrise: 'sunrise@demo.surplate.sg',
+  crumb: 'crumb@demo.surplate.sg',
+  charity: 'hope@demo.surplate.sg',
 };
 
-/** Open the app as one of the demo accounts. Call before page.goto. */
+/** Log in as a seeded demo account. The login cookie lands in the browser context, so call before page.goto. */
 async function actAs(page, who) {
-  await page.addInitScript(([key, id]) => localStorage.setItem(key, id), ['surplate.demoUserId', USERS[who]]);
+  const res = await page.request.post('/api/auth/login', { data: { email: EMAILS[who], password: 'demo1234' } });
+  expect(res.ok(), `login as ${who}`).toBe(true);
 }
 
 // OneMap is a live third-party API; tests mock our proxy endpoint so they stay fast and stable.
@@ -49,8 +50,11 @@ async function postListing(page, name, { quantity = '6', tags = ['vegan'], aller
 }
 
 test.describe('browsing the board', () => {
+  // Verified charities see every listing, which is what these board tests need (visibility.spec.js covers the other visitors).
+  test.beforeEach(async ({ page }) => actAs(page, 'charity'));
+
   test('shows open listings with a map, and hides ended ones', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(page.getByRole('heading', { name: 'Rescue surplus food' })).toBeVisible();
     await expect(card(page, 'Assorted croissants')).toBeVisible();
     await expect(card(page, 'Pandan buns')).toBeVisible();
@@ -63,7 +67,7 @@ test.describe('browsing the board', () => {
   });
 
   test('filters update the results without reloading the page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(card(page, 'Pandan buns')).toBeVisible();
     await page.evaluate(() => (window.__sameDocument = true)); // wiped by a full page reload
 
@@ -97,7 +101,7 @@ test.describe('browsing the board', () => {
 
   test('filters by distance from a searched address, nearest first', async ({ page }) => {
     await mockGeocode(page);
-    await page.goto('/');
+    await page.goto('/browse');
     await page.getByLabel('Near').fill('eng hoon');
     await page.getByRole('option', { name: /56 ENG HOON/ }).click(); // Tiong Bahru: only Sunrise Bakery is within 2 km
     await page.getByLabel('within').selectOption('2');
@@ -107,7 +111,7 @@ test.describe('browsing the board', () => {
   });
 
   test('opens a listing detail page and links on to reservation', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/browse');
     await card(page, 'Sourdough loaves').getByRole('link', { name: 'Sourdough loaves' }).click();
     await expect(page.getByTestId('listing-title')).toHaveText('Sourdough loaves');
     await expect(page.getByText('Contains: gluten')).toBeVisible();
@@ -119,7 +123,7 @@ test.describe('browsing the board', () => {
 
   test('on a phone, the map is a separate tab', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(card(page, 'Pandan buns')).toBeVisible();
     await expect(page.getByTestId('listing-map')).toBeHidden();
     await page.getByRole('button', { name: 'Map' }).click();
@@ -145,7 +149,7 @@ test.describe('a bakery posting and managing listings', () => {
     await expect(page.getByText('Contains: gluten')).toBeVisible();
     await expect(page.getByAltText(`Photo of ${name}`)).toBeVisible();
 
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(card(page, name)).toBeVisible();
     await expect(card(page, name)).toContainText('Sunrise Bakery');
     await expect(card(page, name)).toContainText('vegan');
@@ -154,6 +158,8 @@ test.describe('a bakery posting and managing listings', () => {
   test('shows clear validation errors and does not submit an incomplete form', async ({ page }) => {
     await mockGeocode(page);
     await page.goto('/listings/new');
+    await expect(page.getByLabel('Pickup address')).toHaveValue(/ENG HOON/); // pre-filled from the bakery's profile
+    await page.getByLabel('Pickup address').fill('');
     await page.getByLabel('Pickup closes').fill('2020-01-01T10:00');
     await page.getByTestId('submit-listing').click();
 
@@ -214,7 +220,7 @@ test.describe('a bakery posting and managing listings', () => {
     await expect(row).toHaveCount(0);
     await expect(page.getByTestId('flash')).toContainText('was removed');
 
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(page.getByTestId('listing-card').first()).toBeVisible();
     await expect(card(page, name)).toHaveCount(0);
   });
@@ -239,26 +245,36 @@ test.describe('a bakery posting and managing listings', () => {
     await expect(page.getByTestId('detail-quantity')).toContainText('7 of 7');
     await expect(page.getByAltText('Photo of Kaya toast sets')).toBeVisible(); // photo copied over
 
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(card(page, 'Kaya toast sets')).toBeVisible();
   });
 });
 
 test.describe('permissions', () => {
-  test('non-bakery accounts cannot post or manage listings', async ({ page }) => {
+  test('a charity cannot post or manage listings', async ({ page }) => {
     await actAs(page, 'charity');
-    await page.goto('/');
+    await page.goto('/browse');
     await expect(page.getByRole('link', { name: 'Post surplus' })).toHaveCount(0);
     await page.goto('/listings/new');
-    await expect(page.getByTestId('bakery-only')).toBeVisible();
+    await expect(page.getByTestId('forbidden')).toBeVisible();
     await page.goto('/my-listings');
-    await expect(page.getByTestId('bakery-only')).toBeVisible();
+    await expect(page.getByTestId('forbidden')).toBeVisible();
+  });
+
+  test('a guest is sent to log in, and returns to the page they wanted', async ({ page }) => {
+    await page.goto('/listings/new');
+    await expect(page).toHaveURL(/\/login\?next=.*listings.*new/);
+    await page.getByLabel('Email').fill(EMAILS.sunrise);
+    await page.getByLabel('Password', { exact: true }).fill('demo1234');
+    await page.getByTestId('login-submit').click();
+    await expect(page).toHaveURL(/\/listings\/new$/);
+    await expect(page.getByRole('heading', { name: 'Post surplus food' })).toBeVisible();
   });
 
   test("another bakery cannot edit or remove a bakery's listing", async ({ page }) => {
     await actAs(page, 'crumb');
-    await page.goto('/');
-    await card(page, 'Sourdough loaves').getByRole('link', { name: 'Sourdough loaves' }).click(); // Sunrise's listing
+    await page.goto('/browse');
+    await card(page, 'Assorted croissants').getByRole('link', { name: 'Assorted croissants' }).click(); // Sunrise's listing
     await expect(page.getByTestId('listing-title')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Edit listing' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Remove listing' })).toHaveCount(0);
@@ -267,7 +283,7 @@ test.describe('permissions', () => {
     const id = page.url().split('/').pop();
     await page.goto(`/listings/${id}/edit`);
     await expect(page.getByText('only edit listings posted by your own bakery')).toBeVisible();
-    const res = await page.request.delete(`/api/listings/${id}`, { headers: { 'x-user-id': USERS.crumb } });
+    const res = await page.request.delete(`/api/listings/${id}`);
     expect(res.status()).toBe(403);
   });
 
