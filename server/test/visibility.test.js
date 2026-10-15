@@ -22,7 +22,7 @@ const boardNames = async (as) => (await board(as)).map((l) => l.itemName);
 const inHours = (h) => new Date(Date.now() + h * 3600e3).toISOString();
 function listingForm(over = {}) {
   const fd = new FormData();
-  const fields = { itemName: 'Visibility test buns', quantity: 4, pickupStart: inHours(-0.1), pickupEnd: inHours(2), bestBefore: inHours(5), address: '56 ENG HOON STREET', lat: 1.2851, lng: 103.8317, ...over };
+  const fields = { weightGramsPerUnit: 100, itemName: 'Visibility test buns', quantity: 4, pickupStart: inHours(-0.1), pickupEnd: inHours(2), bestBefore: inHours(5), address: '56 ENG HOON STREET', lat: 1.2851, lng: 103.8317, ...over };
   for (const [k, v] of Object.entries(fields)) fd.append(k, v);
   fd.append('photo', new Blob([PNG], { type: 'image/png' }), 'p.png');
   return fd;
@@ -102,7 +102,7 @@ describe('opening a hidden listing directly', () => {
 });
 
 describe('a bakery choosing who sees a listing', () => {
-  test('new listings are charities-only unless the bakery shares them', async () => {
+  test('new listings have priority even when an old client sets the sharing flag', async () => {
     const hidden = await (await create({ itemName: 'Default-hidden rolls' })).json();
     assert.equal(hidden.visibleToIndividuals, false);
     assert.ok(!(await boardNames(INDIVIDUAL)).includes('Default-hidden rolls'));
@@ -110,21 +110,16 @@ describe('a bakery choosing who sees a listing', () => {
 
     const shared = await (await create({ itemName: 'Shared rolls', visibleToIndividuals: true })).json();
     assert.equal(shared.visibleToIndividuals, true);
-    assert.ok((await boardNames(INDIVIDUAL)).includes('Shared rolls'));
-    assert.ok((await boardNames()).includes('Shared rolls'));
+    assert.ok(!(await boardNames(INDIVIDUAL)).includes('Shared rolls'));
+    assert.ok(!(await boardNames()).includes('Shared rolls'));
   });
 
-  test('editing the switch shows or hides the listing straight away', async () => {
-    const { id } = await (await create({ itemName: 'Toggle rolls' })).json();
-    assert.ok(!(await boardNames(INDIVIDUAL)).includes('Toggle rolls'));
-
-    assert.equal((await put(id, { itemName: 'Toggle rolls', visibleToIndividuals: true })).status, 200);
-    assert.ok((await boardNames(INDIVIDUAL)).includes('Toggle rolls'));
-    assert.equal((await call(`/listings/${id}`, INDIVIDUAL)).status, 200);
-
-    assert.equal((await put(id, { itemName: 'Toggle rolls', visibleToIndividuals: false })).status, 200);
-    assert.ok(!(await boardNames(INDIVIDUAL)).includes('Toggle rolls'));
-    assert.equal((await call(`/listings/${id}`, INDIVIDUAL)).status, 404);
+  test('editing does not restart or bypass priority', async () => {
+    const original = await (await create({ itemName: 'Toggle rolls' })).json();
+    await put(original.id, { itemName: 'Toggle rolls', visibleToIndividuals: true });
+    const updated = await (await call(`/listings/${original.id}`, SUNRISE)).json();
+    assert.equal(updated.priorityUntil, original.priorityUntil);
+    assert.equal((await call(`/listings/${original.id}`, INDIVIDUAL)).status, 404);
   });
 
   test('re-posting keeps the original choice', async () => {

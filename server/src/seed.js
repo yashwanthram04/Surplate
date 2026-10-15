@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { connectDb } from './db.js';
 import Listing from './models/Listing.js';
 import User from './models/User.js';
+import Reservation from './models/Reservation.js';
 
 const MIN = 60 * 1000;
 
@@ -41,6 +42,7 @@ function placeholderPhoto(emoji, from, to) {
 function demoListings(now) {
   const t = (offsetMin) => new Date(now + offsetMin * MIN);
   const row = (owner, site, item) => ({
+    weightGramsPerUnit: 100,
     bakery: owner._id,
     bakeryName: owner.name,
     address: site.address,
@@ -98,14 +100,24 @@ function demoListings(now) {
 /** Inserts demo users and listings. With reset it first clears both collections. */
 export async function seedDemoData({ reset = false } = {}) {
   if (reset) {
-    await Promise.all([Listing.deleteMany({}), User.deleteMany({})]);
+    await Promise.all([Reservation.deleteMany({}), Listing.deleteMany({}), User.deleteMany({})]);
   } else if ((await User.countDocuments()) > 0) {
     console.log('Database already has users, skipping seed (use `npm run seed:reset` to start over).');
     return;
   }
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   await User.insertMany(DEMO_USERS.map((u) => ({ ...u, passwordHash })));
-  await Listing.insertMany(demoListings(Date.now()));
+  const listings = await Listing.insertMany(demoListings(Date.now()));
+  const past = listings.find((l) => l.itemName === 'Kaya toast sets');
+  // All ten unavailable units on the historical listing are represented in history.
+  await Reservation.insertMany([
+    { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 6, status: 'collected', collectedAt: new Date(Date.now() - 90 * MIN) },
+    { recipient: id(5), recipientName: 'Alex Tan', recipientRole: 'individual', quantity: 3, status: 'collected', collectedAt: new Date(Date.now() - 85 * MIN) },
+    { recipient: id(5), recipientName: 'Alex Tan', recipientRole: 'individual', quantity: 1, status: 'expired' },
+    { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 1, status: 'cancelled', cancelledAt: new Date(Date.now() - 100 * MIN) },
+  ].map((r) => ({ listing: past._id, bakery: past.bakery, bakeryName: past.bakeryName, itemName: past.itemName,
+    address: past.address, pickupStart: past.pickupStart, pickupEnd: past.pickupEnd, createdAt: past.pickupStart,
+    updatedAt: r.collectedAt ?? r.cancelledAt ?? past.pickupEnd, weightGramsPerUnit: 100, gramsPerMeal: 500, ...r })));
   console.log(`Seeded ${DEMO_USERS.length} demo users (password: ${DEMO_PASSWORD}) and 8 demo listings.`);
 }
 

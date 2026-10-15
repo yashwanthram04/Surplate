@@ -41,6 +41,7 @@ async function postListing(page, name, { quantity = '6', tags = ['vegan'], aller
   await page.getByLabel('What are you offering?').fill(name);
   await page.getByLabel('Description').fill('Baked this afternoon.');
   await page.getByLabel('Quantity').fill(quantity);
+  await page.getByLabel('Weight per unit (grams)').fill('100');
   for (const t of tags) await page.locator(`label[for="diet-${t}"]`).click();
   for (const a of allergens) await page.locator(`label[for="allergen-${a}"]`).click();
   await page.getByLabel('Photo').setInputFiles(PHOTO);
@@ -118,7 +119,7 @@ test.describe('browsing the board', () => {
     await expect(page.getByTestId('detail-quantity')).toContainText('6 of 6');
     await expect(page.getByTestId('listing-map')).toBeVisible();
     await page.getByTestId('reserve-btn').click();
-    await expect(page.getByTestId('reserve-placeholder')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reserve food' })).toBeVisible();
   });
 
   test('on a phone, the map is a separate tab', async ({ page }) => {

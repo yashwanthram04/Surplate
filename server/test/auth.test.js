@@ -136,10 +136,10 @@ describe('profile', () => {
     const { user } = await reg.json();
     const fd = new FormData();
     const when = (h) => new Date(Date.now() + h * 3600e3).toISOString();
-    Object.entries({ itemName: 'Doomed buns', quantity: 3, pickupStart: when(-0.1), pickupEnd: when(2), bestBefore: when(5), address: '1 Test Road', lat: 1.3, lng: 103.85, visibleToIndividuals: true }).forEach(([k, v]) => fd.append(k, v));
+    Object.entries({ itemName: 'Doomed buns', weightGramsPerUnit: 100, quantity: 3, pickupStart: when(-0.1), pickupEnd: when(2), bestBefore: when(5), address: '1 Test Road', lat: 1.3, lng: 103.85, visibleToIndividuals: true }).forEach(([k, v]) => fd.append(k, v));
     fd.append('photo', new Blob([Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')], { type: 'image/png' }), 'p.png');
     assert.equal((await call('/listings', { method: 'POST', as: cookie, body: fd })).status, 201);
-    const onBoard = async () => (await (await call('/listings')).json()).items.some((l) => l.itemName === 'Doomed buns'); // as a guest
+    const onBoard = async () => (await (await call('/listings', { as: cookie })).json()).items.some((l) => l.itemName === 'Doomed buns'); // owner can see its listing during priority
     assert.ok(await onBoard());
 
     const wrong = await call('/auth/me', { method: 'DELETE', as: cookie, json: { password: 'not-my-password1' } });

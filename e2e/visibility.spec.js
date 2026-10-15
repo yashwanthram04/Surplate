@@ -92,58 +92,38 @@ test.describe('who sees what on the board', () => {
     await page.getByLabel('Email').fill('alex@demo.surplate.sg');
     await page.getByLabel('Password', { exact: true }).fill('demo1234');
     await page.getByTestId('login-submit').click();
-    await expect(page.getByTestId('reserve-placeholder')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reserve food' })).toBeVisible();
   });
 });
 
 test.describe('a bakery choosing who sees a listing', () => {
-  test('new listings default to charities only; sharing it with individuals is one switch away', async ({ page, browser }) => {
-    const name = `Switch rolls ${Date.now().toString(36)}`;
-    await mockGeocode(page);
+  test('new listings start with charity priority and edits keep the clock', async ({ page, browser }) => {
+    const name = `Priority rolls ${Date.now().toString(36)}`;
     await logIn(page, 'sunrise@demo.surplate.sg');
-
-    // post it with the default setting
     await page.goto('/listings/new');
-    const toggle = page.getByTestId('share-switch');
-    await expect(toggle).not.toBeChecked();
-    await expect(page.getByTestId('share-help')).toContainText('Only verified charities can see this listing');
+    await expect(page.getByText('New listings are reserved for verified charities')).toBeVisible();
     await page.getByLabel('What are you offering?').fill(name);
     await page.getByLabel('Quantity').fill('5');
+    await page.getByLabel('Weight per unit (grams)').fill('100');
     await page.getByLabel('Photo').setInputFiles(PHOTO);
     await page.getByTestId('submit-listing').click();
     await expect(page.getByTestId('listing-title')).toHaveText(name);
-    await expect(page.getByTestId('owner-visibility-note')).toContainText('Only verified charities');
+    await expect(page.getByText('Charity priority', { exact: true })).toBeVisible();
     const listingUrl = page.url();
-
-    // an individual cannot find it, and its link says it is unavailable
+    const id = listingUrl.split('/').pop();
+    const original = await (await page.request.get(`/api/listings/${id}`)).json();
     const person = await browser.newContext();
     const personPage = await person.newPage();
     await logIn(personPage, 'alex@demo.surplate.sg');
-    await personPage.goto('/browse');
-    await expect(personPage.getByTestId('listing-card').first()).toBeVisible();
-    await expect(card(personPage, name)).toHaveCount(0);
     await personPage.goto(listingUrl);
     await expect(personPage.getByTestId('not-found')).toBeVisible();
-
-    // the owner still sees it on the board, marked
-    await page.goto('/browse');
-    await expect(card(page, name).getByTestId('charities-only')).toBeVisible();
-
-    // share it: edit, flip the switch
-    await page.goto(listingUrl);
+    await person.close();
     await page.getByRole('link', { name: 'Edit listing' }).click();
-    await expect(toggle).not.toBeChecked();
-    await page.locator('label[for="visibleToIndividuals"]').click();
-    await expect(page.getByTestId('share-help')).toContainText('Everyone can see and reserve');
+    await page.getByLabel('Quantity').fill('6');
     await page.getByTestId('submit-listing').click();
     await expect(page.getByTestId('flash')).toContainText('changes have been saved');
-    await expect(page.getByTestId('charities-only')).toHaveCount(0);
-
-    // now the individual sees it
-    await personPage.goto('/browse');
-    await expect(card(personPage, name)).toBeVisible();
-    await expect(card(personPage, name).getByTestId('charities-only')).toHaveCount(0);
-    await person.close();
+    const updated = await (await page.request.get(`/api/listings/${id}`)).json();
+    expect(updated.priorityUntil).toBe(original.priorityUntil);
   });
 
   test('My listings marks the charity-only ones', async ({ page }) => {

@@ -6,3 +6,10 @@ export function jwtSecret() {
   if (isProd) throw new Error('JWT_SECRET must be set in production.');
   return 'surplate-dev-secret-not-for-production';
 }
+
+function positiveSetting(name, fallback) {
+  const n = Number(process.env[name] ?? fallback);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+export const priorityMinutes = () => positiveSetting('CHARITY_PRIORITY_MINUTES', 15);
+export const gramsPerMeal = () => positiveSetting('GRAMS_PER_MEAL', 500);
