@@ -69,7 +69,7 @@ onBeforeUnmount(() => {
       <!-- Charities-only listings are hidden from everyone except verified charities, so say so instead of leaving people guessing -->
       <div v-if="!session.hasFullAccess" class="small text-body-secondary mt-2" data-testid="partial-view-note">
         <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-        You're seeing the listings bakeries share with everyone. Verified charities see more.
+        Verified charities see more during charity priority periods. New listings open to everyone after priority ends; some older listings remain charity-only.
         <template v-if="session.isCharity">Your charity is awaiting verification.</template>
         <RouterLink v-else-if="!session.isLoggedIn" to="/register?role=charity">Register a charity</RouterLink>
       </div>

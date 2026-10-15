@@ -50,6 +50,8 @@ async function logout() {
             <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>
             <li class="nav-item"><RouterLink class="nav-link" to="/my-listings">My listings</RouterLink></li>
           </template>
+          <li v-if="session.isLoggedIn" class="nav-item"><RouterLink class="nav-link" to="/impact">Impact dashboard</RouterLink></li>
+          <li v-if="session.isLoggedIn && !session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/reservations">{{ session.isBakery ? 'Collections' : 'My reservations' }}</RouterLink></li>
           <li v-if="session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/admin/charities">Verify charities</RouterLink></li>
         </ul>
 

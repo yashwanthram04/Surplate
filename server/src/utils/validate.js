@@ -35,6 +35,11 @@ export function parseListingInput(body = {}, now = new Date()) {
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) errors.quantity = 'Quantity must be a whole number from 1 to 500.';
   value.quantity = quantity;
+  if (body.weightGramsPerUnit !== undefined) {
+    const weight = Number(body.weightGramsPerUnit);
+    if (!Number.isInteger(weight) || weight < 1 || weight > 100000) errors.weightGramsPerUnit = 'Enter a whole weight from 1 to 100000 grams per unit.';
+    value.weightGramsPerUnit = weight;
+  }
 
   value.dietaryTags = [...new Set(toList(body.dietaryTags))];
   if (value.dietaryTags.some((t) => !DIETARY_TAGS.includes(t))) errors.dietaryTags = 'Unknown dietary tag.';

@@ -18,9 +18,10 @@ const form = reactive({
   itemName: '',
   description: '',
   quantity: '',
+  weightGramsPerUnit: '',
   dietaryTags: [],
   allergens: [],
-  visibleToIndividuals: false, // charities only, unless the bakery chooses to share
+  visibleToIndividuals: false, // Used only for older listings without a priority timestamp.
   pickupStart: toLocalInput(new Date()),
   pickupEnd: toLocalInput(minutesFromNow(120)),
   bestBefore: toLocalInput(minutesFromNow(360)),
@@ -32,6 +33,7 @@ const form = reactive({
 const photoFile = ref(null);
 const photoPreview = ref('');
 const existingPhoto = ref('');
+const originalTimes = {};
 const photoProblem = ref('');
 const pickedAddress = ref('');
 
@@ -55,7 +57,9 @@ async function loadExisting() {
     Object.assign(form, {
       itemName: data.itemName,
       description: data.description,
+      priorityUntil: data.priorityUntil,
       quantity: data.quantity,
+      weightGramsPerUnit: data.weightGramsPerUnit ?? '',
       dietaryTags: [...data.dietaryTags],
       allergens: [...data.allergens],
       visibleToIndividuals: data.visibleToIndividuals,
@@ -67,6 +71,7 @@ async function loadExisting() {
       lat: data.lat,
       lng: data.lng,
     });
+    Object.assign(originalTimes, { pickupStart: data.pickupStart, pickupEnd: data.pickupEnd, bestBefore: data.bestBefore });
     pickedAddress.value = data.address;
     existingPhoto.value = data.photoUrl || '';
     notOwner.value = data.bakery.id !== session.user?.id;
@@ -93,6 +98,9 @@ const clientErrors = computed(() => {
   if (form.description.length > 500) e.description = 'Description can be at most 500 characters.';
   const q = Number(form.quantity);
   if (form.quantity === '' || !Number.isInteger(q) || q < 1 || q > 500) e.quantity = 'Enter a whole number from 1 to 500.';
+
+  const weight = Number(form.weightGramsPerUnit);
+  if (!Number.isInteger(weight) || weight < 1 || weight > 100000) e.weightGramsPerUnit = 'Enter a whole weight from 1 to 100000 grams per unit.';
 
   const start = new Date(form.pickupStart);
   const end = new Date(form.pickupEnd);
@@ -170,12 +178,14 @@ async function submit() {
   fd.append('itemName', form.itemName.trim());
   fd.append('description', form.description.trim());
   fd.append('quantity', form.quantity);
+  fd.append('weightGramsPerUnit', form.weightGramsPerUnit);
   form.dietaryTags.forEach((t) => fd.append('dietaryTags', t));
   form.allergens.forEach((a) => fd.append('allergens', a));
   fd.append('visibleToIndividuals', form.visibleToIndividuals);
-  fd.append('pickupStart', fromLocalInput(form.pickupStart));
-  fd.append('pickupEnd', fromLocalInput(form.pickupEnd));
-  fd.append('bestBefore', fromLocalInput(form.bestBefore));
+  // datetime-local displays minutes. Keep the original seconds when the user did not edit a time.
+  for (const field of ['pickupStart', 'pickupEnd', 'bestBefore']) {
+    fd.append(field, originalTimes[field] && form[field] === toLocalInput(originalTimes[field]) ? originalTimes[field] : fromLocalInput(form[field]));
+  }
   fd.append('address', form.address);
   fd.append('postal', form.postal);
   fd.append('lat', form.lat);
@@ -244,6 +254,12 @@ async function focusFirstError() {
               </div>
             </div>
 
+            <div class="mb-3">
+              <label for="weightGramsPerUnit" class="form-label fw-semibold">Weight per unit (grams)</label>
+              <input id="weightGramsPerUnit" v-model="form.weightGramsPerUnit" type="number" min="1" max="100000" step="1" class="form-control" :class="cls('weightGramsPerUnit')" :aria-invalid="!!err('weightGramsPerUnit')" aria-describedby="weight-error" />
+              <div id="weight-error" class="invalid-feedback">{{ err('weightGramsPerUnit') }}</div>
+              <div class="form-text">Weight of one reservable item or pack, used to estimate collected kilograms.</div>
+            </div>
             <fieldset class="mb-3">
               <legend class="form-label fw-semibold fs-6">Dietary tags</legend>
               <div class="d-flex flex-wrap gap-1">
@@ -299,15 +315,11 @@ async function focusFirstError() {
           </div>
 
           <div class="bg-white border rounded-4 p-3 p-md-4 mb-4">
-            <div class="fw-semibold mb-2" id="who-label">Who can see this listing?</div>
-            <div class="form-check form-switch">
-              <input id="visibleToIndividuals" v-model="form.visibleToIndividuals" class="form-check-input" type="checkbox" role="switch" aria-describedby="who-help" data-testid="share-switch" />
-              <label class="form-check-label" for="visibleToIndividuals">Also show it to individuals</label>
-            </div>
-            <div id="who-help" class="form-text" data-testid="share-help">
-              <template v-if="form.visibleToIndividuals"><i class="bi bi-people-fill me-1" aria-hidden="true"></i>Everyone can see and reserve this listing.</template>
-              <template v-else><i class="bi bi-shield-check me-1" aria-hidden="true"></i>Only verified charities can see this listing. Turn this on to share it with everyone.</template>
-            </div>
+            <div class="fw-semibold mb-2">Charity priority</div>
+            <p class="small text-body-secondary mb-0">New listings are reserved for verified charities during a short priority period, then open to everyone. Editing does not restart the clock.</p>
+            <template v-if="editing && !form.priorityUntil">
+              <div class="form-check form-switch mt-2"><input id="visibleToIndividuals" v-model="form.visibleToIndividuals" class="form-check-input" type="checkbox" /><label for="visibleToIndividuals" class="form-check-label">Also share this older listing with individuals</label></div>
+            </template>
           </div>
 
           <div class="bg-white border rounded-4 p-3 p-md-4">

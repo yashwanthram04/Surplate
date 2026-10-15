@@ -6,6 +6,8 @@ import User from '../models/User.js';
 import { toUserDTO } from '../utils/serialize.js';
 import { parseAccountFields, parseRegistration, passwordProblem } from '../utils/validateUser.js';
 
+import { cancelOpen, transaction } from '../services/reservations.js';
+
 const router = Router();
 const ROUNDS = 10;
 // Compared against when the email is unknown, so a wrong email and a wrong password take the same time.
@@ -100,15 +102,18 @@ router.put('/me', requireLogin, async (req, res) => {
 });
 
 // DELETE /api/auth/me – delete my account (needs my password). A bakery's listings come off the board.
-// TODO(Reservations): cancel the account's open reservations here too.
+// Completed reservation snapshots are retained after account deletion.
 router.delete('/me', requireLogin, async (req, res) => {
   if (req.user.role === 'admin') return res.status(403).json({ error: 'Admin accounts cannot be deleted here.' });
   const user = await User.findById(req.user._id).select('+passwordHash');
   if (!(await bcrypt.compare(String(req.body?.password ?? ''), user.passwordHash))) {
     return invalid(res, { password: 'That password is not correct.' });
   }
-  if (user.role === 'bakery') await Listing.updateMany({ bakery: user._id, status: 'active' }, { status: 'removed' });
-  await user.deleteOne();
+  await transaction(async (session) => {
+    await User.deleteOne({ _id: user._id }, { session });
+    if (user.role === 'bakery') await Listing.updateMany({ bakery: user._id, status: 'active' }, { status: 'removed' }, { session });
+    await cancelOpen(user.role === 'bakery' ? { bakery: user._id } : { recipient: user._id }, session);
+  });
   clearToken(res);
   res.status(204).end();
 });

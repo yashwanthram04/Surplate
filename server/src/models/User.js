@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false }, // never returned unless asked for explicitly
     role: { type: String, enum: ROLES, required: true },
+    reservationVersion: { type: Number, default: 0 },
     phone: { type: String, default: '' },
 
     // Charities only: the registration number the admin checks before approving.

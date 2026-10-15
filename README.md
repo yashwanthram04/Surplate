@@ -17,7 +17,7 @@ the newest listings, and a sign-up path for each kind of user. All motion respec
 |---|---|---|---|
 | Sign-up | instant | **needs admin verification** (registration number) | instant, no verification |
 | Post and manage listings | yes | no | no |
-| Sees on the board | shared listings + its own | **every listing once verified**; shared listings while pending | shared listings only |
+| Sees on the board | public listings + its own | **every listing once verified**; public listings while pending | listings after charity priority ends |
 
 - Register, log in/out (passwords hashed with bcrypt; login is an `httpOnly` cookie holding a signed token), view and edit your profile, change your password, delete your account.
 - Five wrong passwords lock a login for ten minutes.
@@ -28,7 +28,7 @@ the newest listings, and a sign-up path for each kind of user. All motion respec
 | Capability | Where |
 |---|---|
 | Listing form with validation: photo, item, quantity, allergen + dietary tags, best-before, pickup window | `ListingFormView.vue`, `server/src/utils/validate.js` |
-| **Who can see it:** a per-listing switch, "also show it to individuals" (default off = charities only) | `ListingFormView.vue`, `server/src/utils/visibility.js` |
+| **Who can see it:** new listings have a timed charity priority period, then open to everyone; older listings retain their sharing setting | `ListingFormView.vue`, `server/src/utils/visibility.js` |
 | Address to coordinates with the **OneMap search API** (type-ahead), shown on a **Leaflet** map | `AddressSearch.vue`, `server/src/routes/geocode.js`, `ListingMap.vue` |
 | "My listings": view, edit, remove, one-click **Re-post** | `MyListingsView.vue` |
 | Listings **expire automatically** when the pickup window closes (they leave the board; the record is kept) | `server/src/routes/listings.js`, `BrowseView.vue` |
@@ -47,7 +47,7 @@ npm run install:all      # root + server + client dependencies
 npm run dev              # API on :3000, web app on :5173 (open http://localhost:5173)
 ```
 
-With no configuration the API starts a **temporary in-memory MongoDB** and seeds it with demo accounts and listings,
+With no configuration the API starts a **temporary in-memory MongoDB replica set** and seeds it with demo accounts and listings,
 so it works straight away. The data is lost on restart.
 
 To use the team's shared MongoDB Atlas database instead:
@@ -55,7 +55,7 @@ To use the team's shared MongoDB Atlas database instead:
 ```bash
 cp server/.env.example server/.env     # then fill in MONGODB_URI (and JWT_SECRET)
 npm --prefix server run seed           # seeds demo users + listings (skips if users already exist)
-npm --prefix server run seed:reset     # wipes users + listings first. Do this before a demo to refresh the times
+npm --prefix server run seed:reset     # wipes users, listings and reservations first. Do this before a demo to refresh the times
 ```
 
 ### Demo accounts
@@ -90,12 +90,33 @@ npm run build                                  # client -> client/dist
 MONGODB_URI=... JWT_SECRET=... npm start       # Express serves the API and the built app (index.html at the root) on $PORT
 ```
 
+## Reservations and impact
+
+- `/listings/:id/reserve`: charities and individuals reserve a whole quantity. Stock and history are written in one MongoDB transaction, preventing overselling and partial writes.
+- `/reservations`: recipients see paginated history; bakeries see their collections and confirm handover during the recorded pickup window. Either party can cancel an open reservation; stock is restored once. Missed pickups appear as expired when read. Expired stock stays off the board because its pickup window has closed.
+- `/impact`: personal and platform totals, organisation breakdowns, and inclusive date filters based on collection time in Singapore. The platform counts each collection once, regardless of its bakery/recipient breakdowns.
+- New listings and reposts open to everyone after `CHARITY_PRIORITY_MINUTES` (default **15**). Verified charities can browse and reserve during priority; all other recipients wait. Board, detail, photo, stats and reservation APIs enforce the same visibility policy. Editing does not restart priority or let an old sharing flag bypass it.
+- Existing listings without `priorityUntil` retain the previous `visibleToIndividuals` rule. No existing data is automatically changed. Reposting adopts the new timed policy.
+- Add **grams per reservable unit/pack** in the listing form. Older records without weight must be edited before they can be reserved. Existing records without completed reservations do not contribute to impact.
+- Only `collected` reservations contribute to kilograms and estimated meals. The default estimate is **500 g per meal**, configurable through `GRAMS_PER_MEAL`. This is a product assumption, not a nutritional standard. Each reservation snapshots weight, conversion, organisation names and pickup details so subsequent edits/deletions cannot rewrite historical impact.
+- Pickup times/address cannot change once stock has been reserved. Removing a listing or deleting an account cancels its pending reservations in the same transaction; collected records remain.
+- The demo seed contains completed, cancelled and expired reservation examples on the historical Kaya toast listing. Existing shared databases are not reseeded automatically.
+
+### API integration
+
+| Endpoint | Access / behavior |
+|---|---|
+| `POST /api/reservations` | Charity/individual; JSON `{ listingId, quantity }` |
+| `GET /api/reservations/mine?page=1` | Own recipient history or bakery collections; 20 per page |
+| `POST /api/reservations/:id/cancel` | Owning recipient or bakery; open reservations only |
+| `POST /api/reservations/:id/collect` | Owning bakery; during pickup only; repeated collection is rejected |
+| `GET /api/impact?from=YYYY-MM-DD&to=YYYY-MM-DD` | Logged-in accounts; own totals plus platform and organisation aggregates; no individual recipient details in platform results |
+| `GET /api/stats` | Existing board inventory figures, kept separate from completed impact |
+
+**Database requirement:** use a MongoDB replica set (including Atlas) for transactions. Local development and tests start their own temporary one-member replica set automatically. A standalone MongoDB server does not support these transactional workflows.
+
 ## Hooks for the other features
 
-- **Who is logged in:** `req.user` on the server (`middleware/auth.js`: `requireLogin`, `requireRole(...)`) and `useSession()` on the client (`isBakery`, `isVerifiedCharity`, `hasFullAccess`, …).
-- **Reservations:** the detail page's *Reserve* button goes to `/listings/:id/reserve` (placeholder view, login required). Only ever change
-  `Listing.quantityRemaining`, atomically: `findOneAndUpdate({ _id, quantityRemaining: { $gte: n } }, { $inc: { quantityRemaining: -n } })`,
-  and check `canView(listing, req.user)` first. Removing a listing or deleting a bakery account has `TODO`s to cancel open reservations.
-- **Cascade / Charity board:** listings carry a `bakery`, `dietaryTags`, `allergens`, `visibleToIndividuals`, `location` (GeoJSON, 2dsphere indexed) and a pickup window; verified charities are the users with `verification.status === 'approved'`.
-- **Impact dashboard:** listings are never hard-deleted or expired in the database. "Expired" is derived from `pickupEnd`.
-
+- `req.user`, `requireLogin`, `requireRole(...)` provide server authentication; `useSession()` mirrors it in Vue.
+- `canView(listing, user, now)` and `visibilityFilter(user, now)` centralise charity priority and legacy listing visibility.
+- `Reservation` is the source of completed impact; do not infer rescued food from `quantity - quantityRemaining` or listing status.

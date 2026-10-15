@@ -63,7 +63,7 @@ async function confirmRemove() {
 const reposting = ref(null);
 const repostBusy = ref(false);
 const repostError = ref('');
-const repostFields = reactive({ quantity: '', pickupStart: '', pickupEnd: '', bestBefore: '' });
+const repostFields = reactive({ weightGramsPerUnit: '', quantity: '', pickupStart: '', pickupEnd: '', bestBefore: '' });
 const repostErrors = ref({});
 function openRepost(l) {
   reposting.value = l;
@@ -71,6 +71,7 @@ function openRepost(l) {
   repostErrors.value = {};
   Object.assign(repostFields, {
     quantity: l.quantity,
+    weightGramsPerUnit: l.weightGramsPerUnit ?? '',
     pickupStart: toLocalInput(new Date()),
     pickupEnd: toLocalInput(minutesFromNow(120)),
     bestBefore: toLocalInput(minutesFromNow(360)),
@@ -83,6 +84,7 @@ async function confirmRepost() {
   try {
     const { data } = await api.post(`/listings/${reposting.value.id}/repost`, {
       quantity: Number(repostFields.quantity),
+      weightGramsPerUnit: Number(repostFields.weightGramsPerUnit),
       pickupStart: fromLocalInput(repostFields.pickupStart),
       pickupEnd: fromLocalInput(repostFields.pickupEnd),
       bestBefore: fromLocalInput(repostFields.bestBefore),
@@ -155,7 +157,7 @@ const badge = (l) => {
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <RouterLink :to="{ name: 'listing', params: { id: l.id } }" class="fw-semibold text-decoration-none text-body">{{ l.itemName }}</RouterLink>
                 <span class="badge" :class="badge(l).cls">{{ badge(l).text }}</span>
-                <span v-if="!l.visibleToIndividuals" class="badge text-bg-light border" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> Charities only</span>
+                <span v-if="l.priorityUntil ? new Date(l.priorityUntil).getTime() > now : !l.visibleToIndividuals" class="badge text-bg-light border" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> {{ l.priorityUntil ? 'Charity priority' : 'Charities only' }}</span>
               </div>
               <div class="small text-body-secondary">{{ formatWindow(l.pickupStart, l.pickupEnd) }}</div>
               <div class="small"><strong>{{ l.quantityRemaining }}</strong> of {{ l.quantity }} left</div>
@@ -178,6 +180,9 @@ const badge = (l) => {
         <p class="small text-body-secondary">Copies <strong>{{ reposting.itemName }}</strong> (photo, tags and address included) with fresh stock and a new pickup window.</p>
         <form class="vstack gap-2" novalidate @submit.prevent="confirmRepost" @keydown.enter.prevent="confirmRepost">
           <div>
+            <label for="rp-weight" class="form-label">Weight per unit (grams)</label>
+            <input id="rp-weight" v-model="repostFields.weightGramsPerUnit" type="number" min="1" max="100000" step="1" class="form-control mb-2" :class="{ 'is-invalid': repostErrors.weightGramsPerUnit }" />
+            <div class="invalid-feedback">{{ repostErrors.weightGramsPerUnit }}</div>
             <label for="rp-qty" class="form-label small fw-semibold mb-1">Quantity</label>
             <input id="rp-qty" v-model="repostFields.quantity" type="number" min="1" max="500" class="form-control" :class="{ 'is-invalid': repostErrors.quantity }" />
             <div class="invalid-feedback">{{ repostErrors.quantity }}</div>

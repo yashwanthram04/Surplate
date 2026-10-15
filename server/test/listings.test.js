@@ -18,7 +18,7 @@ after(() => ctx?.close());
 
 const inHours = (h) => new Date(Date.now() + h * 3600 * 1000).toISOString();
 const validFields = (over = {}) => ({
-  itemName: 'Test rolls', description: 'fresh', quantity: '5', dietaryTags: ['vegan'], allergens: ['gluten'],
+  weightGramsPerUnit: '100', itemName: 'Test rolls', description: 'fresh', quantity: '5', dietaryTags: ['vegan'], allergens: ['gluten'],
   pickupStart: inHours(-0.1), pickupEnd: inHours(2), bestBefore: inHours(6),
   address: '56 ENG HOON STREET', postal: '160056', lat: '1.2851', lng: '103.8317', ...over,
 });
@@ -147,7 +147,8 @@ describe('managing my listings', () => {
     await Listing.updateOne({ _id: id }, { $inc: { quantityRemaining: -6 } });
     const low = await call(`/listings/${id}`, { method: 'PUT', user: SUNRISE, body: form(validFields({ itemName: 'Reserved rolls', quantity: '4' }), { photo: null }) });
     assert.equal(low.status, 422);
-    const ok = await call(`/listings/${id}`, { method: 'PUT', user: SUNRISE, body: form(validFields({ itemName: 'Reserved rolls', quantity: '8' }), { photo: null }) });
+    const original = await Listing.findById(id);
+    const ok = await call(`/listings/${id}`, { method: 'PUT', user: SUNRISE, body: form(validFields({ itemName: 'Reserved rolls', quantity: '8', pickupStart: original.pickupStart.toISOString(), pickupEnd: original.pickupEnd.toISOString() }), { photo: null }) });
     assert.equal((await ok.json()).quantityRemaining, 2);
   });
 

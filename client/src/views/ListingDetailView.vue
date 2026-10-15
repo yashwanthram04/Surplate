@@ -103,7 +103,7 @@ async function remove() {
             <div v-else-if="upcoming" class="alert alert-info mt-3 mb-0 py-2" role="status">Pickup opens {{ formatDateTime(listing.pickupStart) }}.</div>
 
             <div class="d-flex flex-wrap gap-1 mt-3">
-              <span v-if="!listing.visibleToIndividuals" class="tag-pill charity-pill" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> Charities only</span>
+              <span v-if="listing.priorityUntil ? new Date(listing.priorityUntil).getTime() > now : !listing.visibleToIndividuals" class="tag-pill charity-pill" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> {{ listing.priorityUntil ? 'Charity priority' : 'Charities only' }}</span>
               <span v-for="t in listing.dietaryTags" :key="t" class="tag-pill">{{ t }}</span>
               <span v-if="!listing.dietaryTags.length" class="small text-body-secondary">No dietary tags</span>
             </div>
@@ -114,7 +114,7 @@ async function remove() {
               <template v-else>No declared allergens. Ask the bakery if you have a severe allergy.</template>
             </div>
 
-            <div v-if="isOwner && !listing.visibleToIndividuals" class="small text-body-secondary mt-3" data-testid="owner-visibility-note">
+            <div v-if="isOwner && !listing.priorityUntil && !listing.visibleToIndividuals" class="small text-body-secondary mt-3" data-testid="owner-visibility-note">
               Only verified charities can see this listing. Edit it to share it with individuals too.
             </div>
 
@@ -123,6 +123,10 @@ async function remove() {
               <dd class="col-7" data-testid="detail-quantity">
                 <strong>{{ listing.quantityRemaining }}</strong> of {{ listing.quantity }}
               </dd>
+              <dt v-if="listing.priorityUntil" class="col-5">Opens to everyone</dt>
+              <dd v-if="listing.priorityUntil" class="col-7">{{ formatDateTime(listing.priorityUntil) }}</dd>
+              <dt v-if="listing.weightGramsPerUnit" class="col-5">Weight per unit</dt>
+              <dd v-if="listing.weightGramsPerUnit" class="col-7">{{ listing.weightGramsPerUnit }} g</dd>
               <dt class="col-5">Pickup window</dt>
               <dd class="col-7">{{ formatWindow(listing.pickupStart, listing.pickupEnd) }}</dd>
               <dt class="col-5">Best before</dt>
@@ -137,7 +141,7 @@ async function remove() {
                 <RouterLink v-else :to="{ name: 'my-listings' }" class="btn btn-primary"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Re-post from My listings</RouterLink>
                 <button type="button" class="btn btn-outline-danger" @click="confirmRemove = true"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove listing</button>
               </template>
-              <RouterLink v-else-if="!ended && listing.quantityRemaining > 0" :to="{ name: 'reserve', params: { id: listing.id } }" class="btn btn-primary btn-lg" data-testid="reserve-btn">
+              <RouterLink v-else-if="!ended && listing.quantityRemaining > 0 && !session.isBakery && !session.isAdmin" :to="{ name: 'reserve', params: { id: listing.id } }" class="btn btn-primary btn-lg" data-testid="reserve-btn">
                 Reserve
               </RouterLink>
               <button v-else-if="!ended" type="button" class="btn btn-secondary btn-lg" disabled>Fully reserved</button>

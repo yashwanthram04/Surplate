@@ -10,6 +10,8 @@ export function toListingDTO(doc, now = new Date()) {
     itemName: o.itemName,
     description: o.description,
     quantity: o.quantity,
+    weightGramsPerUnit: o.weightGramsPerUnit ?? null,
+    priorityUntil: o.priorityUntil ?? null,
     quantityRemaining: o.quantityRemaining,
     visibleToIndividuals: o.visibleToIndividuals === true,
     dietaryTags: o.dietaryTags,

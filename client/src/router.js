@@ -17,10 +17,12 @@ const router = createRouter({
     { path: '/listings/new', name: 'listing-new', component: () => import('./views/ListingFormView.vue'), meta: { title: 'Post surplus food', roles: BAKERY } },
     { path: '/listings/:id', name: 'listing', component: () => import('./views/ListingDetailView.vue'), props: true },
     { path: '/listings/:id/edit', name: 'listing-edit', component: () => import('./views/ListingFormView.vue'), props: true, meta: { title: 'Edit listing', roles: BAKERY } },
-    // Placeholder for the Reservations feature: the detail page's "Reserve" button lands here.
-    { path: '/listings/:id/reserve', name: 'reserve', component: () => import('./views/ReservePlaceholderView.vue'), props: true, meta: { title: 'Reserve', requiresAuth: true } },
+    // Recipient reservation form. The API independently enforces eligibility.
+    { path: '/listings/:id/reserve', name: 'reserve', component: () => import('./views/ReserveView.vue'), props: true, meta: { title: 'Reserve', roles: ['charity', 'individual'] } },
     { path: '/my-listings', name: 'my-listings', component: () => import('./views/MyListingsView.vue'), meta: { title: 'My listings', roles: BAKERY } },
 
+    { path: '/impact', name: 'impact', component: () => import('./views/ImpactView.vue'), meta: { title: 'Our impact', requiresAuth: true } },
+    { path: '/reservations', name: 'reservations', component: () => import('./views/ReservationsView.vue'), meta: { title: 'Reservations', roles: ['bakery', 'charity', 'individual'] } },
     { path: '/forbidden', name: 'forbidden', component: () => import('./views/ForbiddenView.vue'), meta: { title: 'Not available' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('./views/NotFoundView.vue'), meta: { title: 'Page not found' } },
   ],

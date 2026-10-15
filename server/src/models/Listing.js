@@ -14,9 +14,10 @@ const listingSchema = new mongoose.Schema(
     description: { type: String, default: '', trim: true },
 
     // `quantity` is what the bakery put up; `quantityRemaining` is what is still reservable.
-    // The Reservations feature should only ever change quantityRemaining, atomically
-    // (findOneAndUpdate with { quantityRemaining: { $gte: n } } and $inc).
+    // Reservation stock changes are coordinated with history in a transaction.
     quantity: { type: Number, required: true, min: 1 },
+    weightGramsPerUnit: { type: Number, min: 1, max: 100000 },
+    priorityUntil: Date,
     quantityRemaining: { type: Number, required: true, min: 0 },
 
     dietaryTags: [{ type: String, enum: DIETARY_TAGS }],

@@ -12,8 +12,8 @@ export async function connectDb({ uri = process.env.MONGODB_URI, forceMemory = f
   if (forceMemory) uri = '';
   if (!uri) {
     if (process.env.NODE_ENV === 'production') throw new Error('MONGODB_URI must be set in production.');
-    const { MongoMemoryServer } = await import('mongodb-memory-server');
-    memory = await MongoMemoryServer.create();
+    const { MongoMemoryReplSet } = await import('mongodb-memory-server');
+    memory = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     uri = memory.getUri('surplate');
     usingMemory = true;
     if (!forceMemory) console.log('No MONGODB_URI set: using a temporary in-memory MongoDB (data is lost on restart).');
