@@ -1,0 +1,51 @@
+/* Community Fridge feature. Imported by the fridge components; builds on the tokens in style.css. */
+
+/* Status badge (list cards, detail page, popups, timeline) */
+.fridge-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fridge-badge.lg {
+  font-size: 1rem;
+  padding: 0.35rem 0.9rem;
+}
+.fridge-badge.status-stocked { background: var(--sp-green-soft); color: var(--sp-green-dark); }
+.fridge-badge.status-low { background: #fff3d6; color: #7a4a00; }
+.fridge-badge.status-empty { background: #fbe3e0; color: #8f2a1f; }
+.fridge-badge.status-unknown { background: #e9ecef; color: #495057; }
+
+/* Map pins reuse the .pin shape from style.css. Three classes beat `.pin.is-highlighted`, so the status colour stays. */
+.pin.fridge-pin.status-stocked { background: var(--sp-green); }
+.pin.fridge-pin.status-low { background: var(--sp-amber); }
+.pin.fridge-pin.status-empty { background: var(--sp-red); }
+.pin.fridge-pin.status-unknown { background: #6c757d; }
+.pin.fridge-pin.is-highlighted { box-shadow: 0 0 0 4px rgba(47, 125, 79, 0.35), 0 2px 6px rgba(0, 0, 0, 0.35); }
+.fridge-popup-badge { font-weight: 600; }
+
+/* Big three-way status picker in the update form */
+.status-choice {
+  border-width: 2px;
+  padding: 0.6rem 0.25rem;
+  line-height: 1.2;
+  font-weight: 600;
+}
+.btn-check:focus-visible + .status-choice { outline: 3px solid var(--bs-focus-ring-color); }
+.status-choice.status-stocked { --bs-btn-color: var(--sp-green-dark); --bs-btn-border-color: var(--sp-green); }
+.status-choice.status-low { --bs-btn-color: #7a4a00; --bs-btn-border-color: var(--sp-amber); }
+.status-choice.status-empty { --bs-btn-color: #8f2a1f; --bs-btn-border-color: var(--sp-red); }
+.btn-check:checked + .status-choice.status-stocked { background: var(--sp-green); color: #fff; }
+.btn-check:checked + .status-choice.status-low { background: var(--sp-amber); color: #fff; }
+.btn-check:checked + .status-choice.status-empty { background: var(--sp-red); color: #fff; }
+
+/* Update history */
+.update-list { list-style: none; margin: 0; padding: 0; }
+.update-item { padding: 0.9rem 0; border-top: 1px solid #e8e4da; }
+.update-item:first-child { border-top: 0; }
+.update-photo { max-height: 180px; max-width: 100%; border-radius: 0.6rem; object-fit: cover; }
+.fridge-note { font-style: italic; color: #4a4a4a; }

@@ -23,6 +23,14 @@ const router = createRouter({
 
     { path: '/impact', name: 'impact', component: () => import('./views/ImpactView.vue'), meta: { title: 'Our impact', requiresAuth: true } },
     { path: '/reservations', name: 'reservations', component: () => import('./views/ReservationsView.vue'), meta: { title: 'Reservations', roles: ['bakery', 'charity', 'individual'] } },
+
+    { path: '/fridges', name: 'fridges', component: () => import('./views/FridgesView.vue'), meta: { title: 'Community fridges' } },
+    { path: '/fridges/new', name: 'fridge-new', component: () => import('./views/FridgeFormView.vue'), meta: { title: 'Add a fridge or pantry', requiresAuth: true } },
+    { path: '/fridges/:id', name: 'fridge', component: () => import('./views/FridgeDetailView.vue'), props: true },
+    { path: '/fridges/:id/edit', name: 'fridge-edit', component: () => import('./views/FridgeFormView.vue'), props: true, meta: { title: 'Edit fridge', requiresAuth: true } },
+
+    { path: '/spoiled-alerts', name: 'spoiled-alerts', component: () => import('./views/SpoiledAlertsView.vue'), meta: { title: 'Spoiled food alerts', roles: ['bakery', 'admin'] } },
+
     { path: '/forbidden', name: 'forbidden', component: () => import('./views/ForbiddenView.vue'), meta: { title: 'Not available' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('./views/NotFoundView.vue'), meta: { title: 'Page not found' } },
   ],
