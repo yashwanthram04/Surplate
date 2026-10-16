@@ -38,6 +38,36 @@ the newest listings, and a sign-up path for each kind of user. All motion respec
 
 Hidden listings are hidden by the **server** (board, detail page and photo all return nothing/404), not just in the UI.
 
+### Community fridges and pantries
+Public fridges and pantries where anyone can take or leave food. This works **independently of listings and reservations**, so it covers people outside bakery pickup windows.
+
+| Capability | Where |
+|---|---|
+| Interactive **Leaflet / OneMap** map of fridges and pantries, pins coloured by status (green stocked, amber low, red empty, grey no updates yet), with a list beside it. Filters: status, type, search text, distance ("My location" or an address), sort. Anyone can browse without logging in | `FridgesView.vue`, `FridgeMap.vue`, `FridgeCard.vue` |
+| **Add or edit a fridge** (any logged-in user; the creator or an admin can edit or remove it): name, type, opening hours, address (OneMap type-ahead), optional photo, notes | `FridgeFormView.vue`, `server/src/utils/validateFridge.js` |
+| **Post a status update:** stocked / low / empty, with an optional note on what was dropped off and an optional photo | `FridgeStatusForm.vue`, `FridgeDetailView.vue` |
+| **Latest status and "last updated" time** on every card, map popup and detail page. The fridge keeps a copy of its newest update, so the map needs no joins. A status older than 24 hours is marked "may be out of date". The full history is on the detail page, 20 updates at a time | `FridgeStatusBadge.vue`, `server/src/routes/fridges.js` |
+| **Flag spoiled food and notify suppliers** | `SpoiledFlagModal.vue`, `SpoiledAlertsView.vue` |
+
+**How suppliers are notified.** A supplier is a bakery account. Flagging one specific drop-off notifies only the bakery that posted it. A general flag notifies every bakery that posted an update on that fridge in the last 72 hours. A report nobody can be matched to (for example, the drop-off was by an individual) is still stored and shown to admins. Bakeries see a count badge on **Spoiled alerts** in the navigation bar and can read each report (with its photo) at `/spoiled-alerts` and mark it resolved with a note. Admins see every report. The fridge page shows a warning while a report is open. Notifications are in-app only; there is no email.
+
+- Posting an update or flagging food needs a login. Posts are rate-limited (10 updates per person per fridge per hour; one open spoiled report per person per fridge per hour).
+- Photos are JPEG, PNG or WebP up to 2 MB, checked by their file signature, stored in MongoDB and served with the same hardening headers as listing photos. Spoiled-report photos are visible only to the reporter, the notified bakeries and admins.
+- Removing a fridge is a soft delete: its history and reports are kept, like listings.
+- Opening hours are free text (for example "24 hours" or "Mon-Sat 8am-9pm"), not a structured schedule.
+- `server/src/models/{Fridge,FridgeUpdate,SpoiledReport}.js`, `server/src/routes/fridges.js`, `client/src/views/Fridge*View.vue`, `client/src/utils/fridge.js`
+
+| Endpoint | Access / behavior |
+|---|---|
+| `GET /api/fridges?q=&status=&kind=&lat=&lng=&radiusKm=&sort=` | Anyone; `status` is a comma list of `stocked,low,empty,unknown`; `kind` is `fridge` or `pantry`; `sort` is `recent`, `distance` or `name` |
+| `GET /api/fridges/:id` · `GET /api/fridges/:id/photo` | Anyone |
+| `POST /api/fridges` · `PUT /api/fridges/:id` · `DELETE /api/fridges/:id` | Logged in; multipart for the photo; PUT/DELETE only by the creator or an admin |
+| `GET /api/fridges/:id/updates?before=<ISO date>` | Anyone; newest first, 20 per page; `nextBefore` is null on the last page |
+| `POST /api/fridges/:id/updates` | Logged in; multipart `status`, `note?`, `photo?` |
+| `POST /api/fridges/:id/spoiled` | Logged in; multipart `items`, `note?`, `updateId?`, `photo?`; returns `suppliersNotified` |
+| `GET /api/fridges/alerts?status=open\|resolved` · `GET /api/fridges/alerts/count` | Bakery (reports sent to it) or admin (all) |
+| `POST /api/fridges/alerts/:id/resolve` | The notified bakery or an admin; JSON `{ resolution? }`; once only |
+
 ## Run it locally
 
 Requires Node 20+.
