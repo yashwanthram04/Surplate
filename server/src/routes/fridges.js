@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import { requireLogin, requireRole } from '../middleware/auth.js';
-import Fridge, { FRIDGE_KINDS, FRIDGE_STATUSES } from '../models/Fridge.js';
+import Fridge, { FRIDGE_STATUSES } from '../models/Fridge.js';
 import FridgeUpdate from '../models/FridgeUpdate.js';
 import SpoiledReport from '../models/SpoiledReport.js';
 import { toReportDTO, toFridgeDTO, toUpdateDTO } from '../utils/serializeFridge.js';
@@ -123,12 +123,11 @@ router.post('/alerts/:reportId/resolve', requireSupplierOrAdmin, async (req, res
 // ==================================================================================================
 
 // GET /api/fridges – public map/list. Anyone, logged in or not, can browse.
-//   ?q=text &status=stocked,low &kind=fridge|pantry &lat=&lng=&radiusKm= &sort=recent|distance|name
+//   ?q=text &status=stocked,low &lat=&lng=&radiusKm= &sort=recent|distance|name
 router.get('/', async (req, res) => {
   const filter = { status: 'active' };
   const wanted = toList(req.query.status).filter((s) => [...FRIDGE_STATUSES, 'unknown'].includes(s));
   if (wanted.length) filter.latestStatus = { $in: wanted };
-  if (FRIDGE_KINDS.includes(req.query.kind)) filter.kind = req.query.kind;
   const text = str(req.query.q).trim().slice(0, 60);
   if (text) {
     const rx = new RegExp(escapeRegex(text), 'i');

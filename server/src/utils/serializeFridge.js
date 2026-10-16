@@ -8,7 +8,6 @@ export function toFridgeDTO(doc, { openSpoiledReports = 0 } = {}) {
   return {
     id: String(o._id),
     name: o.name,
-    kind: o.kind ?? 'fridge',
     description: o.description,
     openingHours: o.openingHours,
     address: o.address,

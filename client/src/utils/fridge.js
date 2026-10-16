@@ -11,8 +11,6 @@ export const STATUS_META = {
 };
 export const statusMeta = (status) => STATUS_META[status] ?? STATUS_META.unknown;
 
-export const KIND_LABELS = { fridge: 'Community fridge', pantry: 'Community pantry' };
-
 /** A status older than this is shown with a "may be out of date" hint. */
 export const STALE_MS = 24 * 60 * 60 * 1000;
 export const isStale = (date, nowMs = Date.now()) => !date || nowMs - new Date(date).getTime() > STALE_MS;

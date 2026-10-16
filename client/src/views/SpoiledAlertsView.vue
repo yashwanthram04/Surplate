@@ -66,8 +66,8 @@ async function resolve(report) {
   <div class="mx-auto" style="max-width: 900px">
     <h1 class="h3 mb-1">Spoiled food alerts</h1>
     <p class="text-body-secondary">
-      <template v-if="session.isAdmin">Every spoiled-food report from community fridges and pantries.</template>
-      <template v-else>People flagged food you dropped off at a community fridge or pantry. Please collect it if you can, then mark the alert resolved.</template>
+      <template v-if="session.isAdmin">Every spoiled-food report from community fridges.</template>
+      <template v-else>People flagged food you dropped off at a community fridge. Please collect it if you can, then mark the alert resolved.</template>
     </p>
 
     <ul class="nav nav-pills mb-3" role="tablist">

@@ -2,12 +2,10 @@ import mongoose from 'mongoose';
 
 // Keep these lists in sync with client/src/utils/fridge.js
 export const FRIDGE_STATUSES = ['stocked', 'low', 'empty'];
-export const FRIDGE_KINDS = ['fridge', 'pantry'];
 
 const fridgeSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    kind: { type: String, enum: FRIDGE_KINDS, default: 'fridge' },
     description: { type: String, default: '', trim: true },
     // Free text ("24 hours", "Mon–Sat 8am–9pm"): community fridges rarely keep neat schedules.
     openingHours: { type: String, required: true, trim: true },

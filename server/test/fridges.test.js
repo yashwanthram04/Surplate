@@ -24,7 +24,7 @@ function form(fields, photo) {
   return fd;
 }
 const validFridge = (over = {}) => ({
-  name: 'Test community fridge', kind: 'fridge', openingHours: '24 hours', description: 'Next to the lift.',
+  name: 'Test community fridge', openingHours: '24 hours', description: 'Next to the lift.',
   address: '30 SENG POH ROAD', postal: '168898', lat: '1.2866', lng: '103.8326', ...over,
 });
 const addFridge = (fields = validFridge(), user = ALEX, photo) => call('/fridges', { method: 'POST', user, body: form(fields, photo) });
@@ -39,26 +39,23 @@ describe('browsing the map', () => {
     const tiong = await seeded('Tiong Bahru Community Fridge');
     assert.equal(tiong.latestStatus, 'stocked');
     assert.ok(tiong.latestUpdateAt);
-    assert.equal(tiong.kind, 'fridge');
     assert.ok(tiong.photoUrl);
     assert.equal(typeof tiong.lat, 'number');
-    assert.equal((await seeded('Jurong West Pantry')).latestStatus, 'unknown');
-    assert.equal((await seeded('Jurong West Pantry')).latestUpdateAt, null);
+    assert.equal((await seeded('Jurong West Community Fridge')).latestStatus, 'unknown');
+    assert.equal((await seeded('Jurong West Community Fridge')).latestUpdateAt, null);
   });
 
-  test('filters: status, type, search text', async () => {
-    assert.ok((await names('status=low')).includes('Bugis Neighbourhood Pantry'));
+  test('filters: status and search text', async () => {
+    assert.ok((await names('status=low')).includes('Bugis Neighbourhood Fridge'));
     assert.ok(!(await names('status=low')).includes('Tiong Bahru Community Fridge'));
-    assert.ok((await names('status=unknown')).includes('Jurong West Pantry'));
-    const pantries = await list('kind=pantry');
-    assert.ok(pantries.length >= 2 && pantries.every((f) => f.kind === 'pantry'));
+    assert.ok((await names('status=unknown')).includes('Jurong West Community Fridge'));
     assert.deepEqual(await names('q=tampines'), ['Tampines Hub Fridge']);
     assert.deepEqual(await names('q=.*'), []); // regex characters are treated literally
   });
 
   test('distance filter returns nearest-first within the radius', async () => {
     const near = await list('lat=1.3&lng=103.8559&radiusKm=1');
-    assert.ok(near.some((f) => f.name === 'Bugis Neighbourhood Pantry'));
+    assert.ok(near.some((f) => f.name === 'Bugis Neighbourhood Fridge'));
     assert.ok(near.every((f) => f.distanceKm <= 1));
     const wide = await list('lat=1.3&lng=103.8559&radiusKm=20&sort=distance');
     assert.deepEqual(wide.map((f) => f.distanceKm), wide.map((f) => f.distanceKm).sort((a, b) => a - b));
@@ -97,7 +94,7 @@ describe('adding and managing fridges', () => {
     const photo = await call(f.photoUrl.replace('/api', ''));
     assert.equal(photo.status, 200);
     assert.equal(photo.headers.get('content-type'), 'image/png');
-    assert.match((await call(`/fridges/${(await seeded('Jurong West Pantry')).id}/photo`)).headers.get('content-type'), /^image\/svg\+xml/); // demo fridges have generated photos
+    assert.match((await call(`/fridges/${(await seeded('Jurong West Community Fridge')).id}/photo`)).headers.get('content-type'), /^image\/svg\+xml/); // demo fridges have generated photos
   });
 
   test('requires login', async () => {
@@ -252,7 +249,7 @@ describe('flagging spoiled food and notifying suppliers', () => {
   });
 
   test('validation, login, unknown update, and duplicate reports', async () => {
-    const bugis = await seeded('Bugis Neighbourhood Pantry');
+    const bugis = await seeded('Bugis Neighbourhood Fridge');
     assert.equal((await flag(bugis.id, { items: 'Rice' }, null)).status, 401);
     const bad = await flag(bugis.id, { items: '' });
     assert.equal(bad.status, 422);

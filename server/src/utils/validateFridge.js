@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { FRIDGE_KINDS, FRIDGE_STATUSES } from '../models/Fridge.js';
+import { FRIDGE_STATUSES } from '../models/Fridge.js';
 import { checkPhoto, isInSingapore } from './validate.js';
 
 const text = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -11,9 +11,6 @@ export function parseFridgeInput(body = {}) {
 
   value.name = text(body.name);
   if (value.name.length < 2 || value.name.length > 80) errors.name = 'Name must be 2–80 characters.';
-
-  value.kind = text(body.kind) || 'fridge';
-  if (!FRIDGE_KINDS.includes(value.kind)) errors.kind = 'Choose fridge or pantry.';
 
   value.description = text(body.description);
   if (value.description.length > 500) errors.description = 'Description can be at most 500 characters.';

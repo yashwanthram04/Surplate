@@ -138,5 +138,5 @@ watch(() => props.active, (a) => {
 </script>
 
 <template>
-  <div ref="el" class="map-box" role="region" aria-label="Map of community fridges and pantries" data-testid="fridge-map"></div>
+  <div ref="el" class="map-box" role="region" aria-label="Map of community fridges" data-testid="fridge-map"></div>
 </template>

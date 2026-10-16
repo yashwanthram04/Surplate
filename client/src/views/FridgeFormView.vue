@@ -7,16 +7,15 @@ import FridgeMap from '../components/FridgeMap.vue';
 import { MAX_PHOTO_BYTES } from '../constants';
 import { useFormErrors } from '../composables/useFormErrors';
 import { useSession } from '../stores/session';
-import { KIND_LABELS } from '../utils/fridge';
 
-// One form for both "Add a fridge or pantry" (no id) and "Edit" (id from the route).
+// One form for both "Add a fridge" (no id) and "Edit" (id from the route).
 // Any logged-in user can add one; only its creator (or an admin) can edit it.
 const props = defineProps({ id: { type: String, default: '' } });
 const router = useRouter();
 const session = useSession();
 const editing = computed(() => !!props.id);
 
-const form = reactive({ name: '', kind: 'fridge', description: '', openingHours: '', address: '', postal: '', lat: null, lng: null });
+const form = reactive({ name: '', description: '', openingHours: '', address: '', postal: '', lat: null, lng: null });
 const pickedAddress = ref('');
 const photoFile = ref(null);
 const photoPreview = ref('');
@@ -33,7 +32,7 @@ const formError = ref('');
 async function loadExisting() {
   try {
     const { data } = await api.get(`/fridges/${props.id}`);
-    Object.assign(form, { name: data.name, kind: data.kind, description: data.description, openingHours: data.openingHours, address: data.address, postal: data.postal, lat: data.lat, lng: data.lng });
+    Object.assign(form, { name: data.name, description: data.description, openingHours: data.openingHours, address: data.address, postal: data.postal, lat: data.lat, lng: data.lng });
     pickedAddress.value = data.address;
     existingPhoto.value = data.photoUrl || '';
     notAllowed.value = !(session.isAdmin || data.createdBy.id === session.user?.id);
@@ -97,7 +96,7 @@ async function submit() {
   if (Object.keys(clientErrors.value).length) return focusFirstError();
 
   const fd = new FormData();
-  for (const k of ['name', 'kind', 'openingHours', 'address', 'postal', 'lat', 'lng']) fd.append(k, form[k]);
+  for (const k of ['name', 'openingHours', 'address', 'postal', 'lat', 'lng']) fd.append(k, form[k]);
   fd.append('description', form.description.trim());
   if (photoFile.value) fd.append('photo', photoFile.value);
 
@@ -132,8 +131,8 @@ function focusFirstError() {
 <template>
   <div class="mx-auto" style="max-width: 1100px">
     <RouterLink :to="editing ? { name: 'fridge', params: { id } } : { name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</RouterLink>
-    <h1 class="h3 mt-2">{{ editing ? 'Edit fridge or pantry' : 'Add a fridge or pantry' }}</h1>
-    <p v-if="!editing" class="text-body-secondary">Know a community fridge or pantry where anyone can take or leave food? Add it so others can find it.</p>
+    <h1 class="h3 mt-2">{{ editing ? 'Edit fridge' : 'Add a fridge' }}</h1>
+    <p v-if="!editing" class="text-body-secondary">Know a community fridge where anyone can take or leave food? Add it so others can find it.</p>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
     <div v-else-if="loadError" class="alert alert-warning" role="alert">{{ loadError }} <RouterLink :to="{ name: 'fridges' }" class="alert-link">Back to the map</RouterLink></div>
@@ -149,16 +148,6 @@ function focusFirstError() {
             <input id="name" v-model="form.name" class="form-control" :class="cls('name')" maxlength="80" placeholder="e.g. Tiong Bahru Community Fridge" :aria-invalid="!!err('name')" aria-describedby="name-err" />
             <div id="name-err" class="invalid-feedback">{{ err('name') }}</div>
           </div>
-
-          <fieldset class="mb-3">
-            <legend class="form-label fw-semibold fs-6">Type</legend>
-            <div class="d-flex flex-wrap gap-1">
-              <template v-for="(label, k) in KIND_LABELS" :key="k">
-                <input :id="`kind-${k}`" v-model="form.kind" class="btn-check chip-check" type="radio" name="kind" :value="k" />
-                <label class="btn btn-outline-secondary chip" :for="`kind-${k}`">{{ label }}</label>
-              </template>
-            </div>
-          </fieldset>
 
           <div class="mb-3">
             <label for="openingHours" class="form-label fw-semibold">Opening hours</label>

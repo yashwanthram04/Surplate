@@ -9,7 +9,7 @@ import FridgeStatusForm from '../components/FridgeStatusForm.vue';
 import SpoiledFlagModal from '../components/SpoiledFlagModal.vue';
 import { now } from '../composables/useNow';
 import { useSession } from '../stores/session';
-import { KIND_LABELS, isStale, timeAgo } from '../utils/fridge';
+import { isStale, timeAgo } from '../utils/fridge';
 import { formatDateTime } from '../utils/time';
 
 const props = defineProps({ id: { type: String, required: true } });
@@ -106,7 +106,7 @@ async function remove() {
 
 <template>
   <div class="mx-auto" style="max-width: 1100px">
-    <RouterLink :to="{ name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All fridges &amp; pantries</RouterLink>
+    <RouterLink :to="{ name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All community fridges</RouterLink>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
 
@@ -136,7 +136,7 @@ async function remove() {
           <img v-if="fridge.photoUrl" class="w-100 rounded-4 border" style="aspect-ratio: 3 / 2; object-fit: cover" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" />
           <div v-else class="photo-placeholder rounded-4" aria-hidden="true">🧊</div>
           <div v-if="fridge.description" class="mt-3">
-            <h2 class="h6">About this {{ fridge.kind }}</h2>
+            <h2 class="h6">About this fridge</h2>
             <p class="mb-0" style="white-space: pre-line">{{ fridge.description }}</p>
           </div>
 
@@ -168,7 +168,7 @@ async function remove() {
         <!-- right: current status, details, actions -->
         <div class="col-12 col-lg-5">
           <div class="bg-white border rounded-4 p-4">
-            <div class="text-body-secondary small">{{ KIND_LABELS[fridge.kind] }}</div>
+            <div class="text-body-secondary small">Community fridge</div>
             <h1 class="h3 mb-3" data-testid="fridge-title">{{ fridge.name }}</h1>
 
             <FridgeStatusBadge :status="fridge.latestStatus" large />
@@ -199,7 +199,7 @@ async function remove() {
             <FridgeStatusForm v-if="session.isLoggedIn" :fridge-id="fridge.id" @posted="onPosted" />
             <p v-else class="mb-0">
               <RouterLink :to="{ name: 'login', query: { next: route.fullPath } }" data-testid="login-to-post">Log in</RouterLink>
-              or <RouterLink :to="{ name: 'register' }">sign up</RouterLink> to tell people if this {{ fridge.kind }} is stocked, low or empty.
+              or <RouterLink :to="{ name: 'register' }">sign up</RouterLink> to tell people if this fridge is stocked, low or empty.
             </p>
             <hr />
             <button v-if="session.isLoggedIn" type="button" class="btn btn-outline-danger w-100" data-testid="flag-spoiled" @click="openFlag()">

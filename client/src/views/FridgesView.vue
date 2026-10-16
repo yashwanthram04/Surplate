@@ -6,12 +6,12 @@ import AddressSearch from '../components/AddressSearch.vue';
 import FridgeCard from '../components/FridgeCard.vue';
 import FridgeMap from '../components/FridgeMap.vue';
 import { useSession } from '../stores/session';
-import { FRIDGE_STATUSES, KIND_LABELS, statusMeta } from '../utils/fridge';
+import { FRIDGE_STATUSES, statusMeta } from '../utils/fridge';
 
-// The community fridge & pantry map: interactive map on one side, filterable list on the other.
+// The community fridge map: interactive map on one side, filterable list on the other.
 // Modelled on BrowseView.vue. Anyone can browse, logged in or not.
 const session = useSession();
-const blankFilters = () => ({ q: '', status: [], kind: '', near: null, radiusKm: 5, sort: 'recent' });
+const blankFilters = () => ({ q: '', status: [], near: null, radiusKm: 5, sort: 'recent' });
 const filters = ref(blankFilters());
 const items = ref([]);
 const loading = ref(true);
@@ -30,7 +30,6 @@ async function load() {
   const params = { sort: f.sort };
   if (f.q.trim()) params.q = f.q.trim();
   if (f.status.length) params.status = f.status.join(',');
-  if (f.kind) params.kind = f.kind;
   if (f.near) Object.assign(params, { lat: f.near.lat, lng: f.near.lng, radiusKm: f.radiusKm });
   try {
     const { data } = await api.get('/fridges', { params });
@@ -102,11 +101,11 @@ function clearAll() {
   <div class="row g-4">
     <div class="col-12 d-flex flex-wrap justify-content-between align-items-start gap-2">
       <div>
-        <h1 class="h3 mb-1">Community fridges &amp; pantries</h1>
+        <h1 class="h3 mb-1">Community fridges</h1>
         <p class="text-body-secondary mb-0">Free food, any time of day. Take what you need, leave what you can. No listing or reservation needed.</p>
       </div>
       <RouterLink :to="{ name: 'fridge-new' }" class="btn btn-primary" data-testid="add-fridge">
-        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a fridge or pantry
+        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a fridge
       </RouterLink>
     </div>
 
@@ -121,18 +120,11 @@ function clearAll() {
     <div class="col-12 col-lg-7 col-xxl-8 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'map' }">
       <section class="bg-white border rounded-4 p-3 mb-3" aria-label="Filters">
         <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-6">
+          <div class="col-12 col-md-8">
             <label for="fr-q" class="form-label small fw-semibold mb-1">Search</label>
             <input id="fr-q" type="search" class="form-control" placeholder="Name or address" :value="filters.q" @input="patch({ q: $event.target.value })" />
           </div>
-          <div class="col-6 col-md-3">
-            <label for="fr-kind" class="form-label small fw-semibold mb-1">Type</label>
-            <select id="fr-kind" class="form-select" :value="filters.kind" @change="patch({ kind: $event.target.value })">
-              <option value="">Fridges and pantries</option>
-              <option v-for="(label, k) in KIND_LABELS" :key="k" :value="k">{{ label }}s</option>
-            </select>
-          </div>
-          <div class="col-6 col-md-3">
+          <div class="col-12 col-md-4">
             <label for="fr-sort" class="form-label small fw-semibold mb-1">Sort by</label>
             <select id="fr-sort" class="form-select" :value="filters.sort" @change="patch({ sort: $event.target.value })">
               <option value="recent">Recently updated</option>
@@ -175,7 +167,7 @@ function clearAll() {
           <div v-if="geoError" class="text-danger small mt-1" role="alert">{{ geoError }}</div>
         </div>
 
-        <div v-if="filters.q || filters.status.length || filters.kind || filters.near" class="mt-3">
+        <div v-if="filters.q || filters.status.length || filters.near" class="mt-3">
           <button type="button" class="btn btn-sm btn-link p-0" @click="clearAll"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>Clear all filters</button>
         </div>
       </section>
@@ -195,7 +187,7 @@ function clearAll() {
 
       <div v-else-if="!items.length && !error" class="text-center py-5 bg-white border rounded-4" data-testid="empty-state">
         <div class="display-5 mb-2">🧊</div>
-        <h2 class="h5">No fridges or pantries match</h2>
+        <h2 class="h5">No fridges match</h2>
         <p class="text-body-secondary mb-3">Try widening your filters. Know a fridge that isn't here?</p>
         <RouterLink :to="{ name: 'fridge-new' }" class="btn btn-primary">Add it to the map</RouterLink>
       </div>

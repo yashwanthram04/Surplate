@@ -1,7 +1,7 @@
 <script setup>
 import { RouterLink } from 'vue-router';
 import { now } from '../composables/useNow';
-import { KIND_LABELS, isStale, timeAgo } from '../utils/fridge';
+import { isStale, timeAgo } from '../utils/fridge';
 import FridgeStatusBadge from './FridgeStatusBadge.vue';
 
 defineProps({
@@ -29,7 +29,7 @@ defineEmits(['hover']);
         <RouterLink :to="{ name: 'fridge', params: { id: fridge.id } }" class="stretched-link text-decoration-none text-body">{{ fridge.name }}</RouterLink>
       </h2>
       <div class="small text-body-secondary mb-2">
-        {{ KIND_LABELS[fridge.kind] }}<template v-if="fridge.distanceKm != null"> · {{ fridge.distanceKm }} km away</template>
+        Community fridge<template v-if="fridge.distanceKm != null"> · {{ fridge.distanceKm }} km away</template>
       </div>
 
       <div class="d-flex flex-wrap align-items-center gap-1 mb-2">
