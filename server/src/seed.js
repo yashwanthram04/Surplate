@@ -29,6 +29,8 @@ export const DEMO_USERS = [
   // Waiting in the admin's verification queue
   { _id: id(6), name: 'New Hope Shelter', email: 'newhope@demo.surplate.sg', role: 'charity', registrationNo: 'DEMO-CHARITY-002', verification: { status: 'pending' } },
   { _id: id(7), name: 'Surplate Admin', email: 'admin@demo.surplate.sg', role: 'admin' },
+  // Three missed pickups: blocked from reserving by the reliability check
+  { _id: id(8), name: 'Sam Lee', email: 'sam@demo.surplate.sg', role: 'individual' },
 ];
 
 /** A simple generated placeholder so seeded listings have a photo. */
@@ -43,6 +45,7 @@ function demoListings(now) {
   const t = (offsetMin) => new Date(now + offsetMin * MIN);
   const row = (owner, site, item) => ({
     weightGramsPerUnit: 100,
+    slotMinutes: 30,
     bakery: owner._id,
     bakeryName: owner.name,
     address: site.address,
@@ -66,7 +69,7 @@ function demoListings(now) {
     }),
     row(sunrise, SITES.sunrise, {
       itemName: 'Kaya toast sets', visibleToIndividuals: true, description: 'Left over from the breakfast rush.',
-      quantity: 10, quantityRemaining: 0, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
+      quantity: 12, quantityRemaining: 2, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
       pickupStart: t(-180), pickupEnd: t(-60), bestBefore: t(-30), photo: ['🍞', '#d9f99d', '#65a30d'],
     }),
     row(crumb, SITES.crumb, {
@@ -109,15 +112,26 @@ export async function seedDemoData({ reset = false } = {}) {
   await User.insertMany(DEMO_USERS.map((u) => ({ ...u, passwordHash })));
   const listings = await Listing.insertMany(demoListings(Date.now()));
   const past = listings.find((l) => l.itemName === 'Kaya toast sets');
-  // All ten unavailable units on the historical listing are represented in history.
+  // The ten collected units on the historical listing are in history; missed and cancelled units went back to it.
+  const missed = (n) => ({ recipient: id(8), recipientName: 'Sam Lee', recipientRole: 'individual', quantity: 1, status: 'missed', releasedBy: 'system', missedAt: new Date(Date.now() - (60 - n) * MIN) });
   await Reservation.insertMany([
     { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 6, status: 'collected', collectedAt: new Date(Date.now() - 90 * MIN) },
     { recipient: id(5), recipientName: 'Alex Tan', recipientRole: 'individual', quantity: 3, status: 'collected', collectedAt: new Date(Date.now() - 85 * MIN) },
-    { recipient: id(5), recipientName: 'Alex Tan', recipientRole: 'individual', quantity: 1, status: 'expired' },
+    { recipient: id(8), recipientName: 'Sam Lee', recipientRole: 'individual', quantity: 1, status: 'collected', collectedAt: new Date(Date.now() - 80 * MIN) },
+    missed(0), missed(1), missed(2),
     { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 1, status: 'cancelled', cancelledAt: new Date(Date.now() - 100 * MIN) },
   ].map((r) => ({ listing: past._id, bakery: past.bakery, bakeryName: past.bakeryName, itemName: past.itemName,
     address: past.address, pickupStart: past.pickupStart, pickupEnd: past.pickupEnd, createdAt: past.pickupStart,
-    updatedAt: r.collectedAt ?? r.cancelledAt ?? past.pickupEnd, weightGramsPerUnit: 100, gramsPerMeal: 500, ...r })));
+    slotStart: past.pickupStart, slotEnd: new Date(past.pickupStart.getTime() + 30 * MIN), slotMinutes: 30,
+    updatedAt: r.collectedAt ?? r.cancelledAt ?? r.missedAt, weightGramsPerUnit: 100, gramsPerMeal: 500, ...r })));
+  // An open order for the bakery demo: Hope Kitchen collects 2 sourdough loaves in the next slot with code HKT4X2.
+  const sourdough = listings.find((l) => l.itemName === 'Sourdough loaves');
+  const slotStart = new Date(sourdough.pickupStart.getTime() + 30 * MIN);
+  await Reservation.create({ listing: sourdough._id, bakery: sourdough.bakery, bakeryName: sourdough.bakeryName, itemName: sourdough.itemName,
+    address: sourdough.address, pickupStart: sourdough.pickupStart, pickupEnd: sourdough.pickupEnd,
+    slotStart, slotEnd: new Date(slotStart.getTime() + 30 * MIN), slotMinutes: 30, code: 'HKT4X2',
+    recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 2, weightGramsPerUnit: 100, gramsPerMeal: 500 });
+  await Listing.updateOne({ _id: sourdough._id }, { $inc: { quantityRemaining: -2 } });
   console.log(`Seeded ${DEMO_USERS.length} demo users (password: ${DEMO_PASSWORD}) and 8 demo listings.`);
 }
 

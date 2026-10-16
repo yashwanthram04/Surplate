@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { SLOT_MINUTES } from '../utils/slots.js';
 
 // Keep these lists in sync with client/src/constants.js
 export const DIETARY_TAGS = ['vegetarian', 'vegan', 'halal', 'gluten-free', 'dairy-free', 'nut-free', 'egg-free'];
@@ -26,6 +27,8 @@ const listingSchema = new mongoose.Schema(
     bestBefore: { type: Date, required: true },
     pickupStart: { type: Date, required: true },
     pickupEnd: { type: Date, required: true },
+    // Length of each collection slot in the pickup window (see utils/slots.js). Missing on older listings: 30.
+    slotMinutes: { type: Number, enum: SLOT_MINUTES },
 
     address: { type: String, required: true, trim: true },
     postal: { type: String, default: '' },

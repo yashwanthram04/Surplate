@@ -22,6 +22,7 @@ const router = createRouter({
     { path: '/my-listings', name: 'my-listings', component: () => import('./views/MyListingsView.vue'), meta: { title: 'My listings', roles: BAKERY } },
 
     { path: '/impact', name: 'impact', component: () => import('./views/ImpactView.vue'), meta: { title: 'Our impact', requiresAuth: true } },
+    { path: '/orders', name: 'orders', component: () => import('./views/OrdersView.vue'), meta: { title: 'Orders', roles: BAKERY } },
     { path: '/reservations', name: 'reservations', component: () => import('./views/ReservationsView.vue'), meta: { title: 'Reservations', roles: ['bakery', 'charity', 'individual'] } },
     { path: '/forbidden', name: 'forbidden', component: () => import('./views/ForbiddenView.vue'), meta: { title: 'Not available' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('./views/NotFoundView.vue'), meta: { title: 'Page not found' } },

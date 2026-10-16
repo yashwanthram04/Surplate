@@ -4,6 +4,7 @@ import { MotionConfig } from 'motion-v';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import { ROLE_LABELS } from './constants';
 import { useSession } from './stores/session';
+import SlotReminders from './components/SlotReminders.vue';
 
 const session = useSession();
 const route = useRoute();
@@ -49,9 +50,10 @@ async function logout() {
           <template v-if="session.isBakery">
             <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>
             <li class="nav-item"><RouterLink class="nav-link" to="/my-listings">My listings</RouterLink></li>
+            <li class="nav-item"><RouterLink class="nav-link" to="/orders">Orders</RouterLink></li>
           </template>
           <li v-if="session.isLoggedIn" class="nav-item"><RouterLink class="nav-link" to="/impact">Impact dashboard</RouterLink></li>
-          <li v-if="session.isLoggedIn && !session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/reservations">{{ session.isBakery ? 'Collections' : 'My reservations' }}</RouterLink></li>
+          <li v-if="session.isLoggedIn && !session.isAdmin && !session.isBakery" class="nav-item"><RouterLink class="nav-link" to="/reservations">My reservations</RouterLink></li>
           <li v-if="session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/admin/charities">Verify charities</RouterLink></li>
         </ul>
 
@@ -75,6 +77,7 @@ async function logout() {
 
   <!-- reducedMotion="user": every animation on the site honours the visitor's "reduce motion" setting -->
   <MotionConfig reduced-motion="user">
+    <SlotReminders v-if="session.ready" />
     <main id="main" :class="route.meta.fullWidth ? '' : 'container-fluid px-3 px-lg-4 py-4'">
       <RouterView />
     </main>

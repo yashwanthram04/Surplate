@@ -129,6 +129,8 @@ async function remove() {
               <dd v-if="listing.weightGramsPerUnit" class="col-7">{{ listing.weightGramsPerUnit }} g</dd>
               <dt class="col-5">Pickup window</dt>
               <dd class="col-7">{{ formatWindow(listing.pickupStart, listing.pickupEnd) }}</dd>
+              <dt class="col-5">Collection slots</dt>
+              <dd class="col-7">{{ listing.slotMinutes }} minutes each</dd>
               <dt class="col-5">Best before</dt>
               <dd class="col-7">{{ formatDateTime(listing.bestBefore) }}</dd>
               <dt class="col-5">Address</dt>

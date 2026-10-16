@@ -8,7 +8,7 @@ import { toListingDTO } from '../utils/serialize.js';
 import { canView, visibilityFilter } from '../utils/visibility.js';
 
 import { priorityMinutes } from '../config.js';
-import { cancelOpen, transaction, fail } from '../services/reservations.js';
+import { cancelOpen, transaction, fail, sweepMissed } from '../services/reservations.js';
 
 const router = Router();
 const ENDING_SOON_MS = 2 * 60 * 60 * 1000; // keep in sync with client/src/constants.js
@@ -44,6 +44,7 @@ async function loadOwned(req, res, next) {
 //   ?q=text &dietary=vegan,halal &avoid=nuts,dairy &openNow=true &endingSoon=true
 //   &lat=&lng=&radiusKm=  &sort=ending|distance|newest
 router.get('/', async (req, res) => {
+  await sweepMissed(); // missed pickups put their food back on the board
   const now = new Date();
   const filter = { status: 'active', pickupEnd: { $gt: now }, quantityRemaining: { $gt: 0 }, ...visibilityFilter(req.user) };
 
@@ -110,6 +111,7 @@ router.get('/:id/photo', async (req, res) => {
 
 // GET /api/listings/:id – ended listings stay viewable (shared links) but are flagged phase: 'ended'.
 router.get('/:id', async (req, res) => {
+  await sweepMissed();
   const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('-photo.data');
   if (!doc || !canView(doc, req.user)) return res.status(404).json({ error: 'Listing not found.' });
   res.json(toListingDTO(doc));
@@ -198,6 +200,7 @@ router.post('/:id/repost', requireBakery, loadOwned, async (req, res) => {
     lng: source.location.coordinates[0],
     // ...only stock and times are re-entered
     weightGramsPerUnit: body.weightGramsPerUnit ?? source.weightGramsPerUnit,
+    slotMinutes: body.slotMinutes ?? source.slotMinutes,
     quantity: body.quantity,
     pickupStart: body.pickupStart,
     pickupEnd: body.pickupEnd,
@@ -205,7 +208,7 @@ router.post('/:id/repost', requireBakery, loadOwned, async (req, res) => {
   });
   // Only these fields come from the request, so only these can be reported back.
   if (value.weightGramsPerUnit === undefined) errors.weightGramsPerUnit = 'Enter the weight in grams per unit.';
-  const fields = Object.fromEntries(Object.entries(errors).filter(([k]) => ['quantity', 'weightGramsPerUnit', 'pickupStart', 'pickupEnd', 'bestBefore'].includes(k)));
+  const fields = Object.fromEntries(Object.entries(errors).filter(([k]) => ['quantity', 'weightGramsPerUnit', 'slotMinutes', 'pickupStart', 'pickupEnd', 'bestBefore'].includes(k)));
   if (Object.keys(fields).length) return res.status(422).json({ error: 'Please fix the highlighted fields.', fields });
 
   const copy = await Listing.create({
