@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import { MotionConfig } from 'motion-v';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
+import { api } from './api';
 import { ROLE_LABELS } from './constants';
 import { useSession } from './stores/session';
 import SlotReminders from './components/SlotReminders.vue';
@@ -20,6 +21,20 @@ watch(
   { immediate: true }
 );
 watch(() => route.fullPath, () => (menuOpen.value = false));
+
+const alertCount = ref(0);
+async function refreshAlertCount() {
+  if (!session.isBakery && !session.isAdmin) {
+    alertCount.value = 0;
+    return;
+  }
+  try {
+    alertCount.value = (await api.get('/fridges/alerts/count')).data.open;
+  } catch {
+    /* the badge is a nicety: ignore failures */
+  }
+}
+watch(() => [session.user?.id, route.fullPath], refreshAlertCount, { immediate: true });
 
 async function logout() {
   await session.logout();
@@ -47,6 +62,7 @@ async function logout() {
       <div id="main-nav" class="navbar-collapse collapse" :class="{ show: menuOpen }">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item"><RouterLink class="nav-link" to="/browse">Browse food</RouterLink></li>
+          <li class="nav-item"><RouterLink class="nav-link" to="/fridges">Community fridges</RouterLink></li>
           <template v-if="session.isBakery">
             <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>
             <li class="nav-item"><RouterLink class="nav-link" to="/my-listings">My listings</RouterLink></li>
@@ -55,6 +71,9 @@ async function logout() {
           <li v-if="session.isLoggedIn" class="nav-item"><RouterLink class="nav-link" to="/impact">Impact dashboard</RouterLink></li>
           <li v-if="session.isLoggedIn && !session.isAdmin && !session.isBakery" class="nav-item"><RouterLink class="nav-link" to="/reservations">My reservations</RouterLink></li>
           <li v-if="session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/admin/charities">Verify charities</RouterLink></li>
+          <li v-if="session.isBakery || session.isAdmin" class="nav-item">
+            <RouterLink class="nav-link" to="/spoiled-alerts" data-testid="nav-alerts">Spoiled alerts<span v-if="alertCount" class="badge text-bg-danger ms-1" data-testid="alert-count">{{ alertCount }}</span></RouterLink>
+          </li>
         </ul>
 
         <div v-if="session.ready" class="d-flex align-items-center gap-2 flex-wrap" data-testid="account-nav">

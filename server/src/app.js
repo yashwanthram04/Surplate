@@ -13,6 +13,8 @@ import statsRoutes from './routes/stats.js';
 import reservationRoutes from './routes/reservations.js';
 import impactRoutes from './routes/impact.js';
 
+import fridgeRoutes from './routes/fridges.js';
+
 const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 
 export function createApp() {
@@ -28,6 +30,7 @@ export function createApp() {
   app.use('/api/stats', statsRoutes);
   app.use('/api/reservations', reservationRoutes);
   app.use('/api/impact', impactRoutes);
+  app.use('/api/fridges', fridgeRoutes);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
   // In production the built Vue app is served from the same server (index.html at the root).
