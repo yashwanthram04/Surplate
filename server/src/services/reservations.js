@@ -1,6 +1,8 @@
+import { randomInt } from 'node:crypto';
 import mongoose from 'mongoose';
 import Listing from '../models/Listing.js';
 import Reservation from '../models/Reservation.js';
+import { missedGraceMinutes } from '../config.js';
 
 export const transaction = (work) => mongoose.connection.transaction(work);
 export const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
@@ -9,19 +11,99 @@ export const fail = (message, status = 409) => { throw Object.assign(new Error(m
 export async function cancelOpen(filter, session) {
   const rows = await Reservation.find({ ...filter, status: 'reserved' }).session(session);
   for (const row of rows) {
-    row.status = row.pickupEnd <= new Date() ? 'expired' : 'cancelled';
+    row.status = missedAfter(row) <= new Date() ? 'missed' : 'cancelled';
     row.cancelledAt = new Date();
     await row.save({ session });
     await Listing.updateOne({ _id: row.listing }, { $inc: { quantityRemaining: row.quantity } }, { session });
   }
 }
+
+/** When an uncollected reservation counts as missed: its slot end (the whole window for older records) plus the grace period. */
+export const missedAfter = (r) => new Date((r.slotEnd ?? r.pickupEnd).getTime() + missedGraceMinutes() * 60000);
+
+// ---- reservation codes ---------------------------------------------------------------------
+// No 0/O, 1/I/L: the code is read aloud or typed from a phone screen.
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const normaliseCode = (v) => (typeof v === 'string' ? v.toUpperCase().replace(/[^A-Z0-9]/g, '') : '');
+/** A code no other open reservation at this bakery is using (a partial unique index backs this up). */
+export async function uniqueCode(bakery, session) {
+  for (;;) {
+    const code = Array.from({ length: 6 }, () => CODE_CHARS[randomInt(CODE_CHARS.length)]).join('');
+    if (!(await Reservation.exists({ bakery, code, status: 'reserved' }).session(session))) return code;
+  }
+}
+
+// ---- missed pickups ------------------------------------------------------------------------
+/** Marks one open reservation missed and puts its food back on the listing. Returns null if it was no longer open. */
+export async function markMissed(filter, releasedBy, session, now = new Date()) {
+  const row = await Reservation.findOneAndUpdate({ ...filter, status: 'reserved' },
+    { status: 'missed', missedAt: now, releasedBy }, { session, returnDocument: 'after' });
+  if (row) await Listing.updateOne({ _id: row.listing, status: 'active' }, { $inc: { quantityRemaining: row.quantity } }, { session });
+  return row;
+}
+
+/** Releases every reservation whose grace period has passed. Each is its own transaction, so a collection racing it has one outcome. */
+export async function releaseMissed(now = new Date()) {
+  const cutoff = new Date(now.getTime() - missedGraceMinutes() * 60000);
+  const due = await Reservation.find({ status: 'reserved', $or: [
+    { slotEnd: { $lte: cutoff } },
+    { slotEnd: { $exists: false }, pickupEnd: { $lte: cutoff } },
+  ] }).select('_id').limit(500);
+  for (const { _id } of due) await transaction((session) => markMissed({ _id }, 'system', session, now));
+  return due.length;
+}
+
+// Runs from a timer and before reads that show stock; concurrent callers share one run.
+let running = null;
+export function sweepMissed() {
+  running ??= releaseMissed().finally(() => { running = null; });
+  return running;
+}
+export function startMissedTimer() {
+  return setInterval(() => sweepMissed().catch((err) => console.error('Releasing missed reservations failed:', err)), 60000).unref();
+}
+
+// ---- reliability ---------------------------------------------------------------------------
+// Score = share of a recipient's last 10 finished pickups (in the past 30 days) that were collected.
+// Misses older than 30 days drop out, so a blocked account recovers with time.
+export const RELIABILITY = { recent: 10, days: 30, limitedBelow: 80, blockedBelow: 50, blockedMinMisses: 3, limitedMaxActive: 1 };
+
+export async function reliabilityFor(recipient, session = null, now = new Date()) {
+  const since = new Date(now.getTime() - RELIABILITY.days * 86400000);
+  // Sequential: a transaction's session can't run operations in parallel.
+  const rows = await Reservation.find({ recipient, status: { $in: ['collected', 'missed', 'expired'] }, pickupStart: { $gte: since } })
+    .sort({ pickupStart: -1, _id: -1 }).limit(RELIABILITY.recent).select('status').session(session);
+  const active = await Reservation.countDocuments({ recipient, status: 'reserved' }).session(session);
+  const missed = rows.filter((r) => r.status !== 'collected').length;
+  const collected = rows.length - missed;
+  const score = rows.length ? Math.round((collected / rows.length) * 100) : 100;
+  const level = missed >= RELIABILITY.blockedMinMisses && score < RELIABILITY.blockedBelow ? 'blocked'
+    : score < RELIABILITY.limitedBelow ? 'limited' : 'good';
+  const maxActive = { blocked: 0, limited: RELIABILITY.limitedMaxActive, good: null }[level];
+  return { score, collected, missed, recent: rows.length, level, active, maxActive };
+}
+
+/** Throws the reason a recipient may not hold one more reservation, if any. */
+export function assertCanReserve(reliability) {
+  if (reliability.level === 'blocked') {
+    fail(`Your reliability score is ${reliability.score}% after ${reliability.missed} missed pickups, so you can't reserve right now. Missed pickups stop counting after ${RELIABILITY.days} days.`, 403);
+  }
+  if (reliability.maxActive !== null && reliability.active >= reliability.maxActive) {
+    fail(`Your reliability score is ${reliability.score}%, so you can hold ${reliability.maxActive} reservation at a time. Collect or cancel it first.`, 403);
+  }
+}
+
 export function reservationDTO(doc) {
   const r = doc.toObject();
+  const deadline = missedAfter(r);
   return { id: String(r._id), listingId: String(r.listing), bakeryName: r.bakeryName,
-    recipientName: r.recipientName, itemName: r.itemName, address: r.address,
+    recipientName: r.recipientName, recipientRole: r.recipientRole, itemName: r.itemName, address: r.address,
     quantity: r.quantity, pickupStart: r.pickupStart, pickupEnd: r.pickupEnd,
-    status: r.status === 'reserved' && r.pickupEnd <= new Date() ? 'expired' : r.status,
-    createdAt: r.createdAt, collectedAt: r.collectedAt,
+    slotStart: r.slotStart ?? r.pickupStart, slotEnd: r.slotEnd ?? r.pickupEnd, slotMinutes: r.slotMinutes ?? null,
+    code: r.code ?? null, missedAfter: deadline,
+    status: r.status === 'expired' || (r.status === 'reserved' && deadline <= new Date()) ? 'missed' : r.status,
+    releasedBy: r.releasedBy ?? null,
+    createdAt: r.createdAt, collectedAt: r.collectedAt, cancelledAt: r.cancelledAt, missedAt: r.missedAt,
     weightKg: r.quantity * r.weightGramsPerUnit / 1000,
     estimatedMeals: r.quantity * r.weightGramsPerUnit / r.gramsPerMeal };
 }

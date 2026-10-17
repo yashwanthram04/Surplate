@@ -7,6 +7,7 @@ import ListingMap from '../components/ListingMap.vue';
 import { ALLERGENS, DIETARY_TAGS, MAX_PHOTO_BYTES } from '../constants';
 import { useSession } from '../stores/session';
 import { fromLocalInput, minutesFromNow, toLocalInput } from '../utils/time';
+import { SLOT_MINUTES } from '../utils/slots';
 
 // One form for both "Post surplus food" (no id) and "Edit listing" (id from the route).
 const props = defineProps({ id: { type: String, default: '' } });
@@ -24,6 +25,7 @@ const form = reactive({
   visibleToIndividuals: false, // Used only for older listings without a priority timestamp.
   pickupStart: toLocalInput(new Date()),
   pickupEnd: toLocalInput(minutesFromNow(120)),
+  slotMinutes: 30,
   bestBefore: toLocalInput(minutesFromNow(360)),
   address: '',
   postal: '',
@@ -65,6 +67,7 @@ async function loadExisting() {
       visibleToIndividuals: data.visibleToIndividuals,
       pickupStart: toLocalInput(data.pickupStart),
       pickupEnd: toLocalInput(data.pickupEnd),
+      slotMinutes: data.slotMinutes,
       bestBefore: toLocalInput(data.bestBefore),
       address: data.address,
       postal: data.postal,
@@ -186,6 +189,7 @@ async function submit() {
   for (const field of ['pickupStart', 'pickupEnd', 'bestBefore']) {
     fd.append(field, originalTimes[field] && form[field] === toLocalInput(originalTimes[field]) ? originalTimes[field] : fromLocalInput(form[field]));
   }
+  fd.append('slotMinutes', form.slotMinutes);
   fd.append('address', form.address);
   fd.append('postal', form.postal);
   fd.append('lat', form.lat);
@@ -294,6 +298,14 @@ async function focusFirstError() {
                 <div class="d-flex gap-1 mt-1" role="group" aria-label="Quick pickup length">
                   <button v-for="h in [1, 2, 3]" :key="h" type="button" class="btn btn-sm btn-outline-secondary py-0" @click="setEndAfter(h)">+{{ h }}h</button>
                 </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <label for="slotMinutes" class="form-label fw-semibold">Collection slot length</label>
+                <select id="slotMinutes" v-model.number="form.slotMinutes" class="form-select" :class="cls('slotMinutes')" :aria-invalid="!!err('slotMinutes')" aria-describedby="slotMinutes-help slotMinutes-err">
+                  <option v-for="m in SLOT_MINUTES" :key="m" :value="m">{{ m }} minutes</option>
+                </select>
+                <div id="slotMinutes-err" class="invalid-feedback">{{ err('slotMinutes') }}</div>
+                <div id="slotMinutes-help" class="form-text">Collectors book one slot inside the pickup window.</div>
               </div>
               <div class="col-12 col-sm-6">
                 <label for="bestBefore" class="form-label fw-semibold">Best before</label>

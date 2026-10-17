@@ -99,7 +99,11 @@ These are for the course demo only: never seed them into a real deployment (the 
 | `hope@demo.surplate.sg` | Charity, **verified** |
 | `newhope@demo.surplate.sg` | Charity, **pending** (in the admin's queue) |
 | `alex@demo.surplate.sg` | Individual |
+| `sam@demo.surplate.sg` | Individual with three missed pickups: **blocked** by the reliability check |
 | `admin@demo.surplate.sg` | Admin |
+
+The seed also gives Hope Kitchen an open order for 2 sourdough loaves at Sunrise Bakery in the slot starting 30 minutes after
+the listing opens, with reservation code **`HKT4X2`**. Log in as Sunrise Bakery and open **Orders** to confirm it.
 
 ## Tests
 
@@ -122,8 +126,14 @@ MONGODB_URI=... JWT_SECRET=... npm start       # Express serves the API and the 
 
 ## Reservations and impact
 
-- `/listings/:id/reserve`: charities and individuals reserve a whole quantity. Stock and history are written in one MongoDB transaction, preventing overselling and partial writes.
-- `/reservations`: recipients see paginated history; bakeries see their collections and confirm handover during the recorded pickup window. Either party can cancel an open reservation; stock is restored once. Missed pickups appear as expired when read. Expired stock stays off the board because its pickup window has closed.
+- **Collection slots:** the bakery chooses a slot length (15, 30 or 60 minutes) on the listing form, and the pickup window is split into slots of that length (the last one ends with the window). Listings posted before this change use 30 minutes.
+- `/listings/:id/reserve`: charities and individuals choose a whole quantity and a slot that has not ended. Both are checked in the form and again on the server. The stock decrement, the reliability check and the reservation are written in one MongoDB transaction, so the listing can't be oversold. The reservation form and the board refresh stock every 15 seconds.
+- Each reservation gets a 6-character **reservation code** (no 0/O/1/I/L), unique among the bakery's open orders.
+- `/reservations` (**My reservations**): recipients see their codes and history, can **change** the quantity or slot until the slot ends, and can cancel an open reservation (stock is restored once). Bakeries see their order history here.
+- `/orders` (bakery **Orders**): staff type in the customer's code to find the order and confirm the collection; the server rejects a confirmation without the matching code. Filters: **To collect** (open orders grouped by slot), **Due soon** (released automatically within 30 minutes, with a countdown) and **No-shows** (missed in the last 7 days, released by staff or automatically), each with a count.
+- **Statuses:** `reserved` → `collected` | `cancelled` | `missed`. A reservation not collected within **15 minutes** after its slot ends (`MISSED_GRACE_MINUTES`) becomes `missed` and its food goes back on the listing. The server releases them every minute and before the board, orders or history are read. Staff can **release a no-show** sooner once its slot has started. Older `expired` records are shown as `missed`.
+- **Reminders:** a banner appears in the app when a slot starts within 30 minutes (per reservation for recipients, per slot for bakery staff), with an optional browser notification while Surplate is open in a tab. There is no email or push: nothing is sent when the app is closed.
+- **Reliability score** = collected ÷ (collected + missed) over the recipient's last 10 finished pickups in the past 30 days. Below 80%: one open reservation at a time. Below 50% with at least 3 misses: no new reservations. Misses stop counting after 30 days, so blocked accounts recover. The score is shown on the reservation form and My reservations.
 - `/impact`: personal and platform totals, organisation breakdowns, and inclusive date filters based on collection time in Singapore. The platform counts each collection once, regardless of its bakery/recipient breakdowns.
 - New listings and reposts open to everyone after `CHARITY_PRIORITY_MINUTES` (default **15**). Verified charities can browse and reserve during priority; all other recipients wait. Board, detail, photo, stats and reservation APIs enforce the same visibility policy. Editing does not restart priority or let an old sharing flag bypass it.
 - Existing listings without `priorityUntil` retain the previous `visibleToIndividuals` rule. No existing data is automatically changed. Reposting adopts the new timed policy.
@@ -136,10 +146,16 @@ MONGODB_URI=... JWT_SECRET=... npm start       # Express serves the API and the 
 
 | Endpoint | Access / behavior |
 |---|---|
-| `POST /api/reservations` | Charity/individual; JSON `{ listingId, quantity }` |
+| `POST /api/reservations` | Charity/individual; JSON `{ listingId, quantity, slotStart }` (`slotStart` is the ISO start of a slot that has not ended); refused with 403 when the reliability score does not allow it |
+| `PATCH /api/reservations/:id` | Owning recipient, until the slot ends; JSON `{ quantity?, slotStart? }` |
+| `GET /api/reservations/reliability` | Charity/individual; score, counts, level (`good`/`limited`/`blocked`) and the rules |
+| `GET /api/reservations/upcoming` | Bakery/recipient; open reservations whose slot starts within 30 minutes or is under way (reminders) |
+| `GET /api/reservations/orders?view=open\|due\|missed` | Bakery; open orders (earliest slot first), those released within 30 minutes, or no-shows from the last 7 days (newest first); includes a count for each view |
+| `GET /api/reservations/lookup?code=` | Bakery; the reservation at this bakery with that code (spaces/dashes and case ignored) |
 | `GET /api/reservations/mine?page=1` | Own recipient history or bakery collections; 20 per page |
 | `POST /api/reservations/:id/cancel` | Owning recipient or bakery; open reservations only |
-| `POST /api/reservations/:id/collect` | Owning bakery; during pickup only; repeated collection is rejected |
+| `POST /api/reservations/:id/collect` | Owning bakery; JSON `{ code }`; from the start of the pickup window until the grace period ends; repeated collection is rejected |
+| `POST /api/reservations/:id/release` | Owning bakery; once the slot has started; marks it `missed` and returns the food to the listing |
 | `GET /api/impact?from=YYYY-MM-DD&to=YYYY-MM-DD` | Logged-in accounts; own totals plus platform and organisation aggregates; no individual recipient details in platform results |
 | `GET /api/stats` | Existing board inventory figures, kept separate from completed impact |
 

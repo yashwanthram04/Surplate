@@ -1,3 +1,5 @@
+import { DEFAULT_SLOT_MINUTES } from './slots.js';
+
 const round = (n, dp) => Math.round(n * 10 ** dp) / 10 ** dp;
 
 /** Public shape of a listing. Never includes the photo bytes. */
@@ -19,6 +21,7 @@ export function toListingDTO(doc, now = new Date()) {
     bestBefore: o.bestBefore,
     pickupStart: o.pickupStart,
     pickupEnd: o.pickupEnd,
+    slotMinutes: o.slotMinutes ?? DEFAULT_SLOT_MINUTES,
     // upcoming: not open yet, open: collectable now, ended: pickup window closed
     phase: now < o.pickupStart ? 'upcoming' : now <= o.pickupEnd ? 'open' : 'ended',
     address: o.address,
