@@ -116,7 +116,7 @@ test.describe('browsing the board', () => {
     await card(page, 'Sourdough loaves').getByRole('link', { name: 'Sourdough loaves' }).click();
     await expect(page.getByTestId('listing-title')).toHaveText('Sourdough loaves');
     await expect(page.getByText('Contains: gluten')).toBeVisible();
-    await expect(page.getByTestId('detail-quantity')).toContainText('6 of 6');
+    await expect(page.getByTestId('detail-quantity')).toContainText('4 of 6'); // the seed reserves 2 for Hope Kitchen
     await expect(page.getByTestId('listing-map')).toBeVisible();
     await page.getByTestId('reserve-btn').click();
     await expect(page.getByRole('heading', { name: 'Reserve food' })).toBeVisible();

@@ -1,4 +1,5 @@
 import { ALLERGENS, DIETARY_TAGS } from '../models/Listing.js';
+import { DEFAULT_SLOT_MINUTES, SLOT_MINUTES } from './slots.js';
 
 const MAX_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -61,6 +62,8 @@ export function parseListingInput(body = {}, now = new Date()) {
     errors.bestBefore = 'Best-before must not be earlier than the end of the pickup window.';
   }
   Object.assign(value, { pickupStart, pickupEnd, bestBefore });
+  value.slotMinutes = body.slotMinutes === undefined || body.slotMinutes === '' ? DEFAULT_SLOT_MINUTES : Number(body.slotMinutes);
+  if (!SLOT_MINUTES.includes(value.slotMinutes)) errors.slotMinutes = `Collection slots must be ${SLOT_MINUTES.join(', ')} minutes long.`;
 
   // multipart forms send "true"/"false"; JSON sends a boolean
   value.visibleToIndividuals = body.visibleToIndividuals === true || body.visibleToIndividuals === 'true';

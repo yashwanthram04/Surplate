@@ -4,6 +4,7 @@ import Listing from '../src/models/Listing.js';
 import Reservation from '../src/models/Reservation.js';
 import User from '../src/models/User.js';
 import { canView, visibilityFilter } from '../src/utils/visibility.js';
+import { slotsFor } from '../src/utils/slots.js';
 import { boot } from './helpers.js';
 
 let ctx, bakery, charity, individual, pending, otherBakery, recipient, owner;
@@ -23,7 +24,14 @@ async function listing(overrides = {}) {
   return Listing.create({ ...source, itemName: `Impact test ${Date.now()}`, quantity: 5, quantityRemaining: 5,
     weightGramsPerUnit: 250, priorityUntil: new Date(Date.now() - 1000), ...overrides });
 }
-const reserve = (l, as = individual, quantity = 1) => call('/reservations', as, { listingId: String(l._id), quantity });
+const openSlot = (l) => slotsFor(l).find((s) => s.end > new Date()).start.toISOString();
+const reserve = (l, as = individual, quantity = 1) => call('/reservations', as, { listingId: String(l._id), quantity, slotStart: openSlot(l) });
+const collect = (r, as) => call(`/reservations/${r.id}/collect`, as, { code: r.code });
+async function newRecipient(email) {
+  const res = await ctx.call('/auth/register', { method: 'POST', json: { name: 'Test recipient', email, password: 'Passw0rdOK', role: 'individual' } });
+  assert.equal(res.status, 201);
+  return ctx.cookieFrom(res);
+}
 const impact = async (as, query = '') => (await ctx.call(`/impact${query}`, { as })).json();
 
 test('priority boundary is identical in the query and direct access rules', async () => {
@@ -80,11 +88,11 @@ test('collection is bakery-scoped, counts once, and preserves the original weigh
   const before = await impact(bakery);
   const r = await (await reserve(l, individual, 2)).json();
   assert.equal((await impact(bakery)).mine.collectedKg, before.mine.collectedKg);
-  assert.equal((await call(`/reservations/${r.id}/collect`, individual)).status, 403);
-  assert.equal((await call(`/reservations/${r.id}/collect`, otherBakery)).status, 403);
+  assert.equal((await collect(r, individual)).status, 403);
+  assert.equal((await collect(r, otherBakery)).status, 403);
   await Listing.updateOne({ _id: l.id }, { weightGramsPerUnit: 999 });
-  assert.equal((await call(`/reservations/${r.id}/collect`, bakery)).status, 200);
-  assert.equal((await call(`/reservations/${r.id}/collect`, bakery)).status, 409);
+  assert.equal((await collect(r, bakery)).status, 200);
+  assert.equal((await collect(r, bakery)).status, 409);
   assert.equal((await call(`/reservations/${r.id}/cancel`, individual)).status, 409);
   const after = await impact(bakery);
   assert.equal(after.mine.collectedKg - before.mine.collectedKg, 0.5);
@@ -102,14 +110,15 @@ test('cancellation restores stock once and cannot be performed by another recipi
   assert.equal((await Listing.findById(l.id)).quantityRemaining, 5);
 });
 
-test('future and missed collections cannot be confirmed; history reports expiry', async () => {
+test('future and missed collections cannot be confirmed; history reports a miss', async () => {
+  const as = await newRecipient('missed-history@example.com'); // a miss lowers reliability, so keep it off the shared demo account
   const l = await listing({ pickupStart: new Date(Date.now() + 30000) });
-  const r = await (await reserve(l)).json();
-  assert.equal((await call(`/reservations/${r.id}/collect`, bakery)).status, 409);
-  await Reservation.updateOne({ _id: r.id }, { pickupEnd: new Date(Date.now() - 1) });
-  assert.equal((await call(`/reservations/${r.id}/collect`, bakery)).status, 409);
-  const history = await (await ctx.call('/reservations/mine', { as: individual })).json();
-  assert.equal(history.items.find((row) => row.id === r.id).status, 'expired');
+  const r = await (await reserve(l, as)).json();
+  assert.equal((await collect(r, bakery)).status, 409);
+  await Reservation.updateOne({ _id: r.id }, { pickupStart: new Date(Date.now() - 3600000), slotEnd: new Date(Date.now() - 3600000) });
+  assert.equal((await collect(r, bakery)).status, 409);
+  const history = await (await ctx.call('/reservations/mine', { as })).json();
+  assert.equal(history.items.find((row) => row.id === r.id).status, 'missed');
 });
 
 test('history is scoped to its recipient and paginated', async () => {
@@ -127,7 +136,7 @@ test('removal cancels open reservations and preserves completed impact', async (
   const l = await listing();
   const collected = await (await reserve(l)).json();
   const open = await (await reserve(l)).json();
-  await call(`/reservations/${collected.id}/collect`, bakery);
+  await collect(collected, bakery);
   const before = await impact(bakery);
   assert.equal((await ctx.call(`/listings/${l.id}`, { method: 'DELETE', as: bakery })).status, 204);
   assert.equal((await Reservation.findById(open.id)).status, 'cancelled');
@@ -143,7 +152,7 @@ test('impact requires login, validates dates and filters using collection time',
   assert.equal((await impact(individual, '?from=2099-01-01')).platform.collections, 0);
   const l = await listing();
   const r = await (await reserve(l)).json();
-  await call(`/reservations/${r.id}/collect`, bakery);
+  await collect(r, bakery);
   await Reservation.updateOne({ _id: r.id }, { collectedAt: new Date('2040-01-01T16:00:00Z') }); // Jan 2 in Singapore
   assert.equal((await impact(individual, '?from=2040-01-02&to=2040-01-02')).mine.collectedKg, 0.25);
   assert.equal((await impact(individual, '?from=2040-01-01&to=2040-01-01')).mine.collectedKg, 0);
@@ -178,7 +187,7 @@ test('a collection racing cancellation has exactly one outcome', async () => {
   const l = await listing();
   const r = await (await reserve(l, individual, 2)).json();
   const responses = await Promise.all([
-    call(`/reservations/${r.id}/collect`, bakery), call(`/reservations/${r.id}/cancel`, individual),
+    collect(r, bakery), call(`/reservations/${r.id}/cancel`, individual),
   ]);
   assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
   const final = await Reservation.findById(r.id);
@@ -195,7 +204,7 @@ test('bakery deletion cancels open collections and retains completed organisatio
   const l = await listing({ bakery: user.id, bakeryName: user.name });
   const collected = await (await reserve(l, charity)).json();
   const pending = await (await reserve(l, individual)).json();
-  await call(`/reservations/${collected.id}/collect`, as);
+  await collect(collected, as);
   assert.equal((await ctx.call('/auth/me', { method: 'DELETE', as, json: { password: 'Passw0rdOK' } })).status, 204);
   assert.equal((await Reservation.findById(pending.id)).status, 'cancelled');
   assert.equal((await Reservation.findById(collected.id)).status, 'collected');

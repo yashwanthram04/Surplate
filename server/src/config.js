@@ -13,3 +13,5 @@ function positiveSetting(name, fallback) {
 }
 export const priorityMinutes = () => positiveSetting('CHARITY_PRIORITY_MINUTES', 15);
 export const gramsPerMeal = () => positiveSetting('GRAMS_PER_MEAL', 500);
+// An uncollected reservation becomes "missed" (and its stock returns to the board) this long after its slot ends.
+export const missedGraceMinutes = () => positiveSetting('MISSED_GRACE_MINUTES', 15);

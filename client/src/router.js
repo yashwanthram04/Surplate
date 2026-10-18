@@ -22,6 +22,7 @@ const router = createRouter({
     { path: '/my-listings', name: 'my-listings', component: () => import('./views/MyListingsView.vue'), meta: { title: 'My listings', roles: BAKERY } },
 
     { path: '/impact', name: 'impact', component: () => import('./views/ImpactView.vue'), meta: { title: 'Our impact', requiresAuth: true } },
+    { path: '/orders', name: 'orders', component: () => import('./views/OrdersView.vue'), meta: { title: 'Orders', roles: BAKERY } },
     { path: '/reservations', name: 'reservations', component: () => import('./views/ReservationsView.vue'), meta: { title: 'Reservations', roles: ['bakery', 'charity', 'individual'] } },
     // >>> FRIDGE FEATURE: ADD these five routes (start). '/fridges/new' must stay above '/fridges/:id'.
     { path: '/fridges', name: 'fridges', component: () => import('./views/FridgesView.vue'), meta: { title: 'Community fridges' } },

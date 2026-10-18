@@ -54,7 +54,7 @@ watch(
   { deep: true }
 );
 load();
-const refresh = setInterval(load, 60 * 1000); // pick up new listings and stock changes
+const refresh = setInterval(load, 15 * 1000); // pick up new listings and stock changes (reservations, releases)
 onBeforeUnmount(() => {
   clearTimeout(debounce);
   clearInterval(refresh);
