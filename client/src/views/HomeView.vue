@@ -93,7 +93,7 @@ const hasStats = computed(() => stats.value !== null);
             <Motion class="d-flex flex-wrap gap-2" :initial="{ opacity: 0, y: 24 }" :animate="{ opacity: 1, y: 0 }" :transition="{ duration: 0.6, delay: 0.38 }">
               <template v-if="!session.isLoggedIn">
                 <RouterLink to="/register?role=bakery" class="btn btn-primary btn-lg btn-lift px-4" data-testid="cta-bakery"><i class="bi bi-shop me-2" aria-hidden="true"></i>I'm a bakery / restaurant</RouterLink>
-                <RouterLink to="/register?role=individual" class="btn btn-outline-primary btn-lg btn-lift px-4 bg-white" data-testid="cta-individual"><i class="bi bi-people me-2" aria-hidden="true"></i>I'm an individual / charity</RouterLink>
+                <RouterLink to="/register?role=individual" class="btn btn-outline-primary btn-lg btn-lift hero-individual-btn px-4" data-testid="cta-individual"><i class="bi bi-people me-2" aria-hidden="true"></i>I'm an individual / charity</RouterLink>
               </template>
               <template v-else-if="session.isBakery">
                 <RouterLink to="/listings/new" class="btn btn-primary btn-lg btn-lift px-4" data-testid="cta-post"><i class="bi bi-plus-lg me-2" aria-hidden="true"></i>Post surplus food</RouterLink>
