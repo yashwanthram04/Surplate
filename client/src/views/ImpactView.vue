@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { api, errorMessage } from '../api';
 import { useSession } from '../stores/session';
+
 const session = useSession();
 const data = ref(null), loading = ref(true), error = ref(''), from = ref(''), to = ref('');
 const personalTitle = computed(() => session.isBakery ? 'Your bakery’s donations' : session.isCharity ? 'Your charity’s collections' : 'Your collections');

@@ -102,6 +102,14 @@
   transform: translateY(0);
 }
 
+.hero-individual-btn {
+  --bs-btn-bg: #fff;
+  --bs-btn-hover-bg: #fff;
+  --bs-btn-hover-color: var(--sp-green-dark);
+  --bs-btn-active-bg: #fff;
+  --bs-btn-active-color: var(--sp-green-dark);
+}
+
 /* floating example listings in the hero */
 .hero-visual {
   position: relative;
