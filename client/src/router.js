@@ -8,12 +8,10 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'home', component: () => import('./views/HomeView.vue'), meta: { title: 'Rescue surplus food', fullWidth: true } },
     { path: '/browse', name: 'browse', component: () => import('./views/BrowseView.vue'), meta: { title: 'Browse surplus food' } },
-
     { path: '/login', name: 'login', component: () => import('./views/LoginView.vue'), meta: { title: 'Log in', guestOnly: true } },
     { path: '/register', name: 'register', component: () => import('./views/RegisterView.vue'), meta: { title: 'Sign up', guestOnly: true } },
     { path: '/profile', name: 'profile', component: () => import('./views/ProfileView.vue'), meta: { title: 'My account', requiresAuth: true } },
     { path: '/admin/charities', name: 'admin-charities', component: () => import('./views/AdminCharitiesView.vue'), meta: { title: 'Verify charities', roles: ['admin'] } },
-
     { path: '/listings/new', name: 'listing-new', component: () => import('./views/ListingFormView.vue'), meta: { title: 'Post surplus food', roles: BAKERY } },
     { path: '/listings/:id', name: 'listing', component: () => import('./views/ListingDetailView.vue'), props: true },
     { path: '/listings/:id/edit', name: 'listing-edit', component: () => import('./views/ListingFormView.vue'), props: true, meta: { title: 'Edit listing', roles: BAKERY } },
@@ -34,6 +32,8 @@ const router = createRouter({
     // <<< FRIDGE FEATURE (end)
     { path: '/forbidden', name: 'forbidden', component: () => import('./views/ForbiddenView.vue'), meta: { title: 'Not available' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('./views/NotFoundView.vue'), meta: { title: 'Page not found' } },
+    // Needs Board Navigation
+    { path: '/needs', name: 'needs', component: () => import('./views/NeedsView.vue'), meta: { title: 'Charity Needs Board', roles: ['charity', 'bakery'] } },
   ],
   scrollBehavior: () => ({ top: 0 }),
 });

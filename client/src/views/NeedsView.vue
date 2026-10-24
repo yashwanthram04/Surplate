@@ -365,7 +365,6 @@ onBeforeUnmount(() => {
       <p class="text-body-secondary">
         Charities can share their food needs, and bakeries can pledge surplus food to help meet them.
       </p>
-      <p>Charity role check: {{ isCharity }}</p>
     </div>
 
 

@@ -63,6 +63,9 @@ async function logout() {
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item"><RouterLink class="nav-link" to="/browse">Browse food</RouterLink></li>
           <li class="nav-item"><RouterLink class="nav-link" to="/fridges">Community fridges</RouterLink></li>
+          <li v-if="session.isBakery || session.isVerifiedCharity" class="nav-item">
+            <RouterLink class="nav-link" to="/needs">Charity Needs Board</RouterLink>
+          </li>
           <template v-if="session.isBakery">
             <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>
             <li class="nav-item"><RouterLink class="nav-link" to="/my-listings">My listings</RouterLink></li>
