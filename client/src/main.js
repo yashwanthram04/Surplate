@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import App from './App.vue';
 import router from './router';
 import './style.css';
+import './reviews.css'; // REVIEWS FEATURE
 
 const app = createApp(App);
 app.use(createPinia());

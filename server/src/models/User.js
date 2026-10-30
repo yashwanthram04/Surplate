@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false }, // never returned unless asked for explicitly
     role: { type: String, enum: ROLES, required: true },
     reservationVersion: { type: Number, default: 0 },
+    // REVIEWS FEATURE: set when an admin approves a reservation-block appeal; until then the block is lifted to "limited".
+    blockWaivedUntil: Date,
     phone: { type: String, default: '' },
 
     // Charities only: the registration number the admin checks before approving.

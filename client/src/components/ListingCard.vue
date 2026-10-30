@@ -36,6 +36,12 @@ defineEmits(['hover']);
       <div class="small text-body-secondary mb-2">
         {{ listing.bakery.name }}<template v-if="listing.distanceKm != null"> · {{ listing.distanceKm }} km away</template>
       </div>
+      <!-- REVIEWS FEATURE: a running thank-you count that opens the bakery's wall -->
+      <div v-if="listing.bakery.thankYouCount" class="mb-2">
+        <RouterLink :to="{ name: 'bakery-wall', params: { id: listing.bakery.id } }" class="thanks-chip" data-testid="thanks-chip" :title="`See what people say about ${listing.bakery.name}`">
+          <span class="heart" aria-hidden="true">💛</span>{{ listing.bakery.thankYouCount }} {{ listing.bakery.thankYouCount === 1 ? 'thank-you' : 'thank-yous' }}
+        </RouterLink>
+      </div>
 
       <div class="d-flex flex-wrap gap-1 mb-2">
         <span v-if="listing.priorityUntil ? new Date(listing.priorityUntil).getTime() > now : !listing.visibleToIndividuals" class="tag-pill charity-pill" data-testid="charities-only"><i class="bi bi-shield-check" aria-hidden="true"></i> {{ listing.priorityUntil ? 'Charity priority' : 'Charities only' }}</span>

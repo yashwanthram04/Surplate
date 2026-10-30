@@ -30,6 +30,11 @@ const router = createRouter({
     // Suppliers (bakeries) see reports about food they dropped off; admins see all of them.
     { path: '/spoiled-alerts', name: 'spoiled-alerts', component: () => import('./views/SpoiledAlertsView.vue'), meta: { title: 'Spoiled food alerts', roles: ['bakery', 'admin'] } },
     // <<< FRIDGE FEATURE (end)
+    // >>> REVIEWS FEATURE: ADD these three routes (start)
+    { path: '/bakeries/:id', name: 'bakery-wall', component: () => import('./views/BakeryWallView.vue'), props: true, meta: { title: 'Thank-you Wall' } },
+    { path: '/ratings', name: 'ratings', component: () => import('./views/RateCustomersView.vue'), meta: { title: 'Rate customers', roles: BAKERY } },
+    { path: '/admin/appeals', name: 'admin-appeals', component: () => import('./views/AdminAppealsView.vue'), meta: { title: 'Block appeals', roles: ['admin'] } },
+    // <<< REVIEWS FEATURE (end)
     { path: '/forbidden', name: 'forbidden', component: () => import('./views/ForbiddenView.vue'), meta: { title: 'Not available' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('./views/NotFoundView.vue'), meta: { title: 'Page not found' } },
     // Needs Board Navigation

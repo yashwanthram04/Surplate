@@ -15,6 +15,11 @@ import impactRoutes from './routes/impact.js';
 
 import fridgeRoutes from './routes/fridges.js';
 
+// >>> REVIEWS FEATURE: ADD these two imports (start)
+import reviewRoutes from './routes/reviews.js';
+import appealRoutes from './routes/appeals.js';
+// <<< REVIEWS FEATURE (end)
+
 const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 
 export function createApp() {
@@ -31,6 +36,10 @@ export function createApp() {
   app.use('/api/reservations', reservationRoutes);
   app.use('/api/impact', impactRoutes);
   app.use('/api/fridges', fridgeRoutes);
+  // >>> REVIEWS FEATURE: ADD these two lines (start)
+  app.use('/api/reviews', reviewRoutes);
+  app.use('/api/appeals', appealRoutes);
+  // <<< REVIEWS FEATURE (end)
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
   // In production the built Vue app is served from the same server (index.html at the root).

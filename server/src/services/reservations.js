@@ -2,7 +2,9 @@ import { randomInt } from 'node:crypto';
 import mongoose from 'mongoose';
 import Listing from '../models/Listing.js';
 import Reservation from '../models/Reservation.js';
+import User from '../models/User.js';
 import { missedGraceMinutes } from '../config.js';
+import { REPUTATION, punctualityFor } from './reputation.js'; // REVIEWS FEATURE
 
 export const transaction = (work) => mongoose.connection.transaction(work);
 export const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
@@ -72,15 +74,32 @@ export async function reliabilityFor(recipient, session = null, now = new Date()
   const since = new Date(now.getTime() - RELIABILITY.days * 86400000);
   // Sequential: a transaction's session can't run operations in parallel.
   const rows = await Reservation.find({ recipient, status: { $in: ['collected', 'missed', 'expired'] }, pickupStart: { $gte: since } })
-    .sort({ pickupStart: -1, _id: -1 }).limit(RELIABILITY.recent).select('status').session(session);
+    .sort({ pickupStart: -1, _id: -1 }).limit(RELIABILITY.recent).select('status pickupStart').session(session);
   const active = await Reservation.countDocuments({ recipient, status: 'reserved' }).session(session);
+  // >>> REVIEWS FEATURE (start): bakeries' punctuality ratings count towards the score, and an approved appeal lifts a block for a while
+  const punctuality = await punctualityFor(recipient, session, now);
+  const account = await User.findById(recipient).select('blockWaivedUntil').session(session);
+  // <<< REVIEWS FEATURE (end)
   const missed = rows.filter((r) => r.status !== 'collected').length;
   const collected = rows.length - missed;
-  const score = rows.length ? Math.round((collected / rows.length) * 100) : 100;
-  const level = missed >= RELIABILITY.blockedMinMisses && score < RELIABILITY.blockedBelow ? 'blocked'
+  const pickupScore = rows.length ? Math.round((collected / rows.length) * 100) : 100;
+  const score = punctuality?.counted
+    ? Math.round(pickupScore * (1 - REPUTATION.punctualityWeight) + punctuality.percent * REPUTATION.punctualityWeight)
+    : pickupScore;
+  let level = missed >= RELIABILITY.blockedMinMisses && score < RELIABILITY.blockedBelow ? 'blocked'
     : score < RELIABILITY.limitedBelow ? 'limited' : 'good';
+  const blockedUntil = level === 'blocked' ? blockLiftsAt(rows, missed) : null;
+  const waivedUntil = level === 'blocked' && account?.blockWaivedUntil > now ? account.blockWaivedUntil : null;
+  if (waivedUntil) level = 'limited';
   const maxActive = { blocked: 0, limited: RELIABILITY.limitedMaxActive, good: null }[level];
-  return { score, collected, missed, recent: rows.length, level, active, maxActive };
+  return { score, pickupScore, punctuality, collected, missed, recent: rows.length, level, active, maxActive, blockedUntil, waivedUntil };
+}
+
+/** When enough missed pickups have aged out (30 days) for the block to lift on its own, assuming nothing else changes. */
+function blockLiftsAt(rows, missed) {
+  const mustExpire = missed - (RELIABILITY.blockedMinMisses - 1);
+  const misses = rows.filter((r) => r.status !== 'collected').map((r) => r.pickupStart.getTime()).sort((a, b) => a - b);
+  return misses[mustExpire - 1] ? new Date(misses[mustExpire - 1] + RELIABILITY.days * 86400000) : null;
 }
 
 /** Throws the reason a recipient may not hold one more reservation, if any. */

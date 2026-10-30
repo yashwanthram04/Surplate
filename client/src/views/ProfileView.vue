@@ -5,6 +5,7 @@ import { api, errorMessage, fieldErrors } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import PasswordInput from '../components/PasswordInput.vue';
+import ReliabilityPanel from '../components/ReliabilityPanel.vue'; // REVIEWS FEATURE
 import { ROLE_LABELS } from '../constants';
 import { useFormErrors } from '../composables/useFormErrors';
 import { useSession } from '../stores/session';
@@ -120,6 +121,9 @@ const status = computed(() => user.value.verification.status);
         <div class="mt-1 small">Correct your registration number below and save to ask for another review.</div>
       </div>
     </div>
+
+    <!-- REVIEWS FEATURE: reliability score (recipients) or reputation (bakeries), with any block and appeal -->
+    <ReliabilityPanel v-if="user.role !== 'admin'" />
 
     <form class="bg-white border rounded-4 p-3 p-md-4 mb-4" novalidate data-testid="profile-form" @submit.prevent="save">
       <h2 class="h5 mb-3">Your details</h2>

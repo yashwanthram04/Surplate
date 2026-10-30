@@ -9,6 +9,11 @@ import Fridge from './models/Fridge.js';
 import FridgeUpdate from './models/FridgeUpdate.js';
 import SpoiledReport from './models/SpoiledReport.js';
 // <<< FRIDGE FEATURE (end)
+// >>> REVIEWS FEATURE: ADD these three imports (start)
+import Review from './models/Review.js';
+import RecipientRating from './models/RecipientRating.js';
+import Appeal from './models/Appeal.js';
+// <<< REVIEWS FEATURE (end)
 
 const MIN = 60 * 1000;
 
@@ -74,7 +79,7 @@ function demoListings(now) {
     }),
     row(sunrise, SITES.sunrise, {
       itemName: 'Kaya toast sets', visibleToIndividuals: true, description: 'Left over from the breakfast rush.',
-      quantity: 12, quantityRemaining: 2, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
+      quantity: 16, quantityRemaining: 2, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
       pickupStart: t(-180), pickupEnd: t(-60), bestBefore: t(-30), photo: ['🍞', '#d9f99d', '#65a30d'],
     }),
     row(crumb, SITES.crumb, {
@@ -155,6 +160,40 @@ export async function seedDemoFridges() {
 }
 // <<< FRIDGE FEATURE (end)
 
+// >>> REVIEWS FEATURE: ADD this whole function (start)
+/**
+ * Demo thank-you notes and bakery ratings of customers. `history` is the Kaya toast reservations in the order seeded
+ * above: Hope 6, Alex 3, Sam 1, Sam missed x3, Hope cancelled, Hope 2, Alex 1, Hope 1.
+ * Alex's 3-unit pickup is left un-reviewed (to demo writing a note) and un-rated (to demo the bakery rating a customer).
+ */
+export async function seedDemoReviews(history) {
+  const [hope6, , sam1, , , , , hope2, alex1, hope1] = history;
+  const sunrise = DEMO_USERS[0];
+  const [hope, alex, sam] = [DEMO_USERS[3], DEMO_USERS[4], DEMO_USERS[7]];
+  const ago = (min) => new Date(Date.now() - min * MIN);
+  const note = (r, who, over) => ({ reservation: r._id, bakery: sunrise._id, author: who._id, authorRole: who.role, itemName: r.itemName, ...over });
+  await Review.insertMany([
+    note(hope6, hope, { nickname: 'Hope Kitchen', note: 'Breakfast for our Saturday residents sorted. Everyone went back for seconds.', foodRating: 5, accuracyRating: 5,
+      onBehalfOf: 'the 40 residents at our Saturday breakfast', peopleServed: 40, pinned: true, pinnedAt: ago(60),
+      reply: { text: 'See you again next Saturday! 🍞', at: ago(55) }, createdAt: ago(80) }),
+    note(sam1, sam, { nickname: 'Sam L.', note: 'Still warm when I picked it up. Thank you!', foodRating: 5, accuracyRating: 4, createdAt: ago(70) }),
+    note(hope2, hope, { nickname: 'Hope Kitchen', note: 'Went straight into tomorrow’s lunch packs.', foodRating: 5, accuracyRating: 5,
+      onBehalfOf: 'our lunch-pack volunteers', peopleServed: 25, createdAt: ago(50) }),
+    note(alex1, alex, { nickname: 'Alex T.', note: 'Generous with the kaya! Made my morning.', foodRating: 4, accuracyRating: 5, createdAt: ago(40) }),
+    note(hope1, hope, { nickname: 'Hope Kitchen', note: 'The listing said baked today, but it was still lovely.', foodRating: 4, accuracyRating: 3, createdAt: ago(30),
+      reply: { text: 'Thanks for the honest feedback. We will update our listings.', at: ago(25) } }),
+  ]);
+  const rating = (r, who, punctuality, comment, minutesAgo) => ({ reservation: r._id, bakery: sunrise._id, bakeryName: sunrise.name,
+    recipient: who._id, recipientName: who.name, punctuality, comment, createdAt: ago(minutesAgo) });
+  await RecipientRating.insertMany([
+    rating(hope6, hope, 5, 'Always right on time.', 85),
+    rating(hope2, hope, 5, '', 72),
+    rating(hope1, hope, 4, 'A few minutes late, but let us know.', 60),
+    rating(alex1, alex, 4, '', 55),
+  ]);
+}
+// <<< REVIEWS FEATURE (end)
+
 /** Inserts demo users and listings. With reset it first clears both collections. */
 export async function seedDemoData({ reset = false } = {}) {
   if (reset) {
@@ -162,6 +201,9 @@ export async function seedDemoData({ reset = false } = {}) {
       // >>> FRIDGE FEATURE: ADD these three clears inside the Promise.all (start)
       Fridge.deleteMany({}), FridgeUpdate.deleteMany({}), SpoiledReport.deleteMany({}),
       // <<< FRIDGE FEATURE (end)
+      // >>> REVIEWS FEATURE: ADD this line inside the Promise.all (start)
+      Review.deleteMany({}), RecipientRating.deleteMany({}), Appeal.deleteMany({}),
+      // <<< REVIEWS FEATURE (end)
     ]);
   } else if ((await User.countDocuments()) > 0) {
     // >>> FRIDGE FEATURE: ADD this block (start): add demo fridges to an already-seeded database that has none yet
@@ -176,12 +218,17 @@ export async function seedDemoData({ reset = false } = {}) {
   const past = listings.find((l) => l.itemName === 'Kaya toast sets');
   // The ten collected units on the historical listing are in history; missed and cancelled units went back to it.
   const missed = (n) => ({ recipient: id(8), recipientName: 'Sam Lee', recipientRole: 'individual', quantity: 1, status: 'missed', releasedBy: 'system', missedAt: new Date(Date.now() - (60 - n) * MIN) });
-  await Reservation.insertMany([
+  const history = await Reservation.insertMany([
     { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 6, status: 'collected', collectedAt: new Date(Date.now() - 90 * MIN) },
     { recipient: id(5), recipientName: 'Alex Tan', recipientRole: 'individual', quantity: 3, status: 'collected', collectedAt: new Date(Date.now() - 85 * MIN) },
     { recipient: id(8), recipientName: 'Sam Lee', recipientRole: 'individual', quantity: 1, status: 'collected', collectedAt: new Date(Date.now() - 80 * MIN) },
     missed(0), missed(1), missed(2),
     { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 1, status: 'cancelled', cancelledAt: new Date(Date.now() - 100 * MIN) },
+    // >>> REVIEWS FEATURE: ADD these three collected pickups (start): more history for the Thank-you Wall to show
+    { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 2, status: 'collected', collectedAt: new Date(Date.now() - 75 * MIN) },
+    { recipient: id(5), recipientName: 'Alex Tan', recipientRole: 'individual', quantity: 1, status: 'collected', collectedAt: new Date(Date.now() - 70 * MIN) },
+    { recipient: id(4), recipientName: 'Hope Kitchen', recipientRole: 'charity', quantity: 1, status: 'collected', collectedAt: new Date(Date.now() - 65 * MIN) },
+    // <<< REVIEWS FEATURE (end)
   ].map((r) => ({ listing: past._id, bakery: past.bakery, bakeryName: past.bakeryName, itemName: past.itemName,
     address: past.address, pickupStart: past.pickupStart, pickupEnd: past.pickupEnd, createdAt: past.pickupStart,
     slotStart: past.pickupStart, slotEnd: new Date(past.pickupStart.getTime() + 30 * MIN), slotMinutes: 30,
@@ -197,6 +244,9 @@ export async function seedDemoData({ reset = false } = {}) {
   // >>> FRIDGE FEATURE: ADD this line (start)
   await seedDemoFridges();
   // <<< FRIDGE FEATURE (end)
+  // >>> REVIEWS FEATURE: ADD this line (start)
+  await seedDemoReviews(history);
+  // <<< REVIEWS FEATURE (end)
   console.log(`Seeded ${DEMO_USERS.length} demo users (password: ${DEMO_PASSWORD}) and 8 demo listings.`);
 }
 

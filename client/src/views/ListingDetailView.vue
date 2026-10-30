@@ -95,6 +95,10 @@ async function remove() {
               <div>
                 <h1 class="h3 mb-1" data-testid="listing-title">{{ listing.itemName }}</h1>
                 <div class="text-body-secondary">{{ listing.bakery.name }}</div>
+                <!-- REVIEWS FEATURE: link to the bakery's Thank-you Wall -->
+                <RouterLink :to="{ name: 'bakery-wall', params: { id: listing.bakery.id } }" class="thanks-chip mt-1" data-testid="wall-link">
+                  <span class="heart" aria-hidden="true">💛</span>{{ listing.bakery.thankYouCount ? `${listing.bakery.thankYouCount} ${listing.bakery.thankYouCount === 1 ? 'thank-you' : 'thank-yous'}` : 'Thank-you Wall' }}
+                </RouterLink>
               </div>
               <CountdownRing :start="listing.pickupStart" :end="listing.pickupEnd" :size="76" />
             </div>

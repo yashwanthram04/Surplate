@@ -125,7 +125,7 @@ async function release() {
           <p v-if="time(found.pickupStart) > now" class="small text-warning-emphasis mt-2 mb-0">The pickup window opens {{ formatDateTime(found.pickupStart) }}. You can confirm from then.</p>
           <button v-else class="btn btn-success mt-2" :disabled="busy" @click="confirmCollection">Confirm collection</button>
         </template>
-        <p v-else-if="found.status === 'collected'" class="small mt-2 mb-0">Collected {{ formatDateTime(found.collectedAt) }}.</p>
+        <p v-else-if="found.status === 'collected'" class="small mt-2 mb-0">Collected {{ formatDateTime(found.collectedAt) }}. <RouterLink to="/ratings">Rate this customer</RouterLink> <!-- REVIEWS FEATURE --></p>
       </div>
     </section>
 

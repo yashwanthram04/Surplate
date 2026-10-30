@@ -9,6 +9,7 @@ import { canView, visibilityFilter } from '../utils/visibility.js';
 
 import { priorityMinutes } from '../config.js';
 import { cancelOpen, transaction, fail, sweepMissed } from '../services/reservations.js';
+import { attachThankYouCounts } from '../services/reputation.js'; // REVIEWS FEATURE
 
 const router = Router();
 const ENDING_SOON_MS = 2 * 60 * 60 * 1000; // keep in sync with client/src/constants.js
@@ -86,7 +87,7 @@ router.get('/', async (req, res) => {
   pipeline.push({ $project: { 'photo.data': 0 } }, { $limit: BROWSE_LIMIT });
 
   const docs = await Listing.aggregate(pipeline);
-  res.json({ items: docs.map((d) => toListingDTO(d, now)) });
+  res.json({ items: await attachThankYouCounts(docs.map((d) => toListingDTO(d, now))) }); // REVIEWS FEATURE: thank-you count on each card
 });
 
 // GET /api/listings/mine – everything the signed-in bakery has posted (including ended listings).
@@ -114,7 +115,9 @@ router.get('/:id', async (req, res) => {
   await sweepMissed();
   const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('-photo.data');
   if (!doc || !canView(doc, req.user)) return res.status(404).json({ error: 'Listing not found.' });
-  res.json(toListingDTO(doc));
+  const dto = toListingDTO(doc);
+  await attachThankYouCounts([dto]); // REVIEWS FEATURE
+  res.json(dto);
 });
 
 // POST /api/listings (multipart/form-data, photo in field "photo")

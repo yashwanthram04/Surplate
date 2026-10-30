@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import Listing from '../models/Listing.js';
 import User from '../models/User.js';
 import Reservation from '../models/Reservation.js';
+import Appeal from '../models/Appeal.js'; // REVIEWS FEATURE
+import { appealDTO } from './appeals.js'; // REVIEWS FEATURE
 import { requireLogin, requireRole } from '../middleware/auth.js';
 import { canView } from '../utils/visibility.js';
 import { DEFAULT_SLOT_MINUTES, findSlot } from '../utils/slots.js';
@@ -46,7 +48,9 @@ router.get('/upcoming', requireRole('bakery', ...RECIPIENTS), async (req, res) =
 
 router.get('/reliability', requireRole(...RECIPIENTS), async (req, res) => {
   await sweepMissed();
-  res.json({ ...(await reliabilityFor(req.user._id)), rules: RELIABILITY });
+  // REVIEWS FEATURE: the latest block appeal rides along, so the notice can show its status
+  const appeal = await Appeal.findOne({ user: req.user._id }).sort({ createdAt: -1 });
+  res.json({ ...(await reliabilityFor(req.user._id)), rules: RELIABILITY, appeal: appeal ? appealDTO(appeal) : null });
 });
 
 // Bakery orders, filtered by ?view=

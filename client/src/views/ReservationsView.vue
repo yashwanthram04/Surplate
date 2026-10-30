@@ -5,11 +5,13 @@ import { api, errorMessage, fieldErrors } from '../api';
 import ReliabilityNotice from '../components/ReliabilityNotice.vue';
 import ReservationFields from '../components/ReservationFields.vue';
 import { useSession } from '../stores/session';
+import { useReviews } from '../stores/reviews'; // REVIEWS FEATURE
 import { now } from '../composables/useNow';
 import { formatDateTime } from '../utils/time';
 import { formatSlot, openSlots } from '../utils/slots';
 import { STATUS_BADGE, reservationErrors, spacedCode } from '../utils/reservations';
 const session = useSession();
+const reviews = useReviews(); // REVIEWS FEATURE
 const route = useRoute();
 const items = ref([]), page = ref(1), total = ref(0), loading = ref(true), error = ref(''), busy = ref(false), notice = ref('');
 const reliability = ref(null);
@@ -21,6 +23,7 @@ async function load() {
     const { data } = await api.get('/reservations/mine', { params: { page: page.value } });
     items.value = data.items; total.value = data.total;
     if (!session.isBakery) reliability.value = (await api.get('/reservations/reliability')).data;
+    reviews.refresh(); // REVIEWS FEATURE: which collected pickups still need a thank-you
   } catch (e) { error.value = errorMessage(e); }
   finally { loading.value = false; }
 }
@@ -91,6 +94,13 @@ onMounted(load);
         <p v-if="row.code && status(row) === 'reserved'" class="mb-1">Reservation code: <strong class="font-monospace fs-5" data-testid="reservation-code">{{ spacedCode(row.code) }}</strong></p>
         <p class="small text-body-secondary mb-1">Reserved {{ formatDateTime(row.createdAt) }}</p>
         <p v-if="row.collectedAt" class="small mb-1">Collected {{ formatDateTime(row.collectedAt) }}</p>
+        <!-- >>> REVIEWS FEATURE (start): thank the bakery for a collected pickup; bakeries rate the customer -->
+        <button v-if="!session.isBakery && row.status === 'collected' && reviews.isPending(row.id)" type="button" class="btn btn-sm btn-outline-primary mt-1" data-testid="say-thanks"
+          @click="reviews.open({ reservationId: row.id, bakeryName: row.bakeryName, itemName: row.itemName, quantity: row.quantity })">
+          <span class="thanks-prompt-emoji fs-6" aria-hidden="true">💛</span> Say thanks
+        </button>
+        <RouterLink v-else-if="session.isBakery && row.status === 'collected'" to="/ratings" class="btn btn-sm btn-outline-primary mt-1">Rate this customer</RouterLink>
+        <!-- <<< REVIEWS FEATURE (end) -->
         <p v-if="status(row) === 'missed'" class="small text-danger mb-1">
           Not collected<template v-if="row.missedAt">: released {{ row.releasedBy === 'bakery' ? 'by the bakery' : 'automatically' }} {{ formatDateTime(row.missedAt) }}</template>. The food went back on the board.
         </p>

@@ -161,6 +161,39 @@ MONGODB_URI=... JWT_SECRET=... npm start       # Express serves the API and the 
 
 **Database requirement:** use a MongoDB replica set (including Atlas) for transactions. Local development and tests start their own temporary one-member replica set automatically. A standalone MongoDB server does not support these transactional workflows.
 
+## Reviews, Thank-you Wall and reliability
+
+Recipients thank a bakery after a collection; bakery staff rate their customers; both sides get a reliability score; a blocked recipient can appeal.
+Code that touches shared files is marked `REVIEWS FEATURE` in comments.
+
+| Capability | Where |
+|---|---|
+| **Say thanks** after a collected pickup: 1–5 stars for the food and for how accurate the listing was, a short note (3–200 characters), quick-compliment chips, and a nickname shown instead of the account name. A **live preview** of the sticky note updates as you type. A floating toast (and a button on My reservations) invites it for 30 days after collection | `ReviewModal.vue`, `ReviewPrompt.vue`, `StarRating.vue`, `stores/reviews.js` |
+| **Charities can thank on behalf of the people they serve** ("our Tuesday volunteers", number of people served) | `ReviewModal.vue`, `server/src/utils/validateReview.js` |
+| **Thank-you Wall** at `/bakeries/:id`, public: notes on tilted sticky notes, pinned ones first, the bakery's reply, filters (all / pinned / from charities), totals, rating bars and the bakery's reliability gauge | `BakeryWallView.vue`, `ThankYouNote.vue` |
+| **Staff tools on their own wall:** pin up to 3 notes, reply (or clear a reply) | `ThankYouNote.vue`, `server/src/routes/reviews.js` |
+| **Running thank-you count** on every listing card and detail page, linking to the wall | `ListingCard.vue`, `server/src/services/reputation.js` |
+| **Bakeries rate customers** on punctuality (1–5, optional comment) for collected pickups from the last 30 days | `RateCustomersView.vue` at `/ratings` |
+| **Reliability scores** (below), shown as an animated gauge on the wall, My account, My reservations and the reservation form | `ReliabilityGauge.vue`, `ReliabilityPanel.vue`, `ReliabilityNotice.vue` |
+| **Temporary block and appeals:** a blocked recipient sees when the block should lift and can appeal (20–500 characters). An admin approves (the block is lifted for 7 days, one reservation at a time) or declines with a reason the recipient sees. One open appeal at a time; 24 hours before appealing again after a decline | `AppealStatus.vue`, `AdminAppealsView.vue` at `/admin/appeals`, `server/src/routes/appeals.js` |
+
+**How the scores are built**
+- **Recipient** = 80% pickups collected (the existing no-show record: last 10 finished pickups in 30 days) + 20% punctuality as rated by bakeries (1 star = 0%, 5 stars = 100%; last 20 ratings in 90 days). Punctuality only counts once there are 3 ratings. The combined score feeds the existing reservation check (below 80%: one open reservation; below 50% with 3+ misses: blocked), so ratings and no-shows both matter. `reliabilityFor` in `server/src/services/reservations.js`.
+- **Bakery** = 60% listing accuracy + 40% food rating, from recipients' notes. Needs 3 notes; until then it shows "New on Surplate". 85+ is "Excellent", 70+ "Good", otherwise "Needs attention". `bakeryReputation` in `server/src/services/reputation.js`.
+- Notes show only the nickname, never the account behind them.
+
+| Endpoint | Access / behavior |
+|---|---|
+| `GET /api/reviews/bakery/:id?page=` | Anyone; reputation summary and notes (12 per page), pinned first |
+| `GET /api/reviews/pending` · `POST /api/reviews` | Charity/individual; JSON `{ reservationId, foodRating, accuracyRating, note, nickname?, onBehalfOf?, peopleServed? }` for a collected pickup; one note per pickup |
+| `PATCH /api/reviews/:id/pin` · `PUT /api/reviews/:id/reply` | Owning bakery; `{ pinned }` (max 3) / `{ text }` (max 140, empty clears) |
+| `GET /api/reviews/to-rate` · `POST /api/reviews/rate` | Bakery; `{ reservationId, punctuality, comment? }`, once per pickup |
+| `GET /api/reviews/me` | Recipient: reliability, recent ratings, latest appeal. Bakery: reputation |
+| `POST /api/appeals` · `GET /api/appeals?status=` · `POST /api/appeals/:id/decision` | Blocked recipient files; admin lists and decides (`approve` / `deny` with a note) |
+
+Demo data: Sunrise Bakery has five notes (one pinned, two replies, charity notes). Log in as **Alex** to see the "Say thanks" banner (one pickup waiting), as **Sunrise** to rate Alex, and as **Sam** (blocked) to file an appeal that **admin** can then decide.
+All motion respects the "reduce motion" setting. Tests: `server/test/reviews.test.js`, `e2e/reviews.spec.js`.
+
 ## Hooks for the other features
 
 - `req.user`, `requireLogin`, `requireRole(...)` provide server authentication; `useSession()` mirrors it in Vue.

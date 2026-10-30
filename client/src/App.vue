@@ -6,6 +6,7 @@ import { api } from './api';
 import { ROLE_LABELS } from './constants';
 import { useSession } from './stores/session';
 import SlotReminders from './components/SlotReminders.vue';
+import ReviewPrompt from './components/ReviewPrompt.vue'; // REVIEWS FEATURE
 
 const session = useSession();
 const route = useRoute();
@@ -35,6 +36,22 @@ async function refreshAlertCount() {
   }
 }
 watch(() => [session.user?.id, route.fullPath], refreshAlertCount, { immediate: true });
+
+// >>> REVIEWS FEATURE: ADD this block (start): badge on the admin's "Appeals" link
+const appealCount = ref(0);
+async function refreshAppealCount() {
+  if (!session.isAdmin) {
+    appealCount.value = 0;
+    return;
+  }
+  try {
+    appealCount.value = (await api.get('/appeals', { params: { status: 'pending' } })).data.counts.pending;
+  } catch {
+    /* the badge is a nicety: ignore failures */
+  }
+}
+watch(() => [session.user?.id, route.fullPath], refreshAppealCount, { immediate: true });
+// <<< REVIEWS FEATURE (end)
 
 async function logout() {
   await session.logout();
@@ -70,10 +87,16 @@ async function logout() {
             <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>
             <li class="nav-item"><RouterLink class="nav-link" to="/my-listings">My listings</RouterLink></li>
             <li class="nav-item"><RouterLink class="nav-link" to="/orders">Orders</RouterLink></li>
+            <!-- REVIEWS FEATURE -->
+            <li class="nav-item"><RouterLink class="nav-link" :to="`/bakeries/${session.user.id}`" data-testid="nav-wall">Thank-you wall</RouterLink></li>
           </template>
           <li v-if="session.isLoggedIn" class="nav-item"><RouterLink class="nav-link" to="/impact">Impact dashboard</RouterLink></li>
           <li v-if="session.isLoggedIn && !session.isAdmin && !session.isBakery" class="nav-item"><RouterLink class="nav-link" to="/reservations">My reservations</RouterLink></li>
           <li v-if="session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/admin/charities">Verify charities</RouterLink></li>
+          <!-- REVIEWS FEATURE -->
+          <li v-if="session.isAdmin" class="nav-item">
+            <RouterLink class="nav-link" to="/admin/appeals" data-testid="nav-appeals">Appeals<span v-if="appealCount" class="badge text-bg-danger ms-1" data-testid="appeal-count">{{ appealCount }}</span></RouterLink>
+          </li>
           <li v-if="session.isBakery || session.isAdmin" class="nav-item">
             <RouterLink class="nav-link" to="/spoiled-alerts" data-testid="nav-alerts">Spoiled alerts<span v-if="alertCount" class="badge text-bg-danger ms-1" data-testid="alert-count">{{ alertCount }}</span></RouterLink>
           </li>
@@ -100,6 +123,7 @@ async function logout() {
   <!-- reducedMotion="user": every animation on the site honours the visitor's "reduce motion" setting -->
   <MotionConfig reduced-motion="user">
     <SlotReminders v-if="session.ready" />
+    <ReviewPrompt v-if="session.ready" />
     <main id="main" :class="route.meta.fullWidth ? '' : 'container-fluid px-3 px-lg-4 py-4'">
       <RouterView />
     </main>
