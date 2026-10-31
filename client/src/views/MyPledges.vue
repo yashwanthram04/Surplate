@@ -6,6 +6,7 @@ defineProps({
     savingPledge: { type: Boolean, default: false },
     pledgeEditError: { type: String, default: '' },
     pledgeEditSuccess: { type: String, default: '' },
+    withdrawingPledgeId: { type: String, default: null },
 });
 
 const emit = defineEmits([
@@ -13,6 +14,7 @@ const emit = defineEmits([
   'stop-edit',
   'save-quantity',
   'update:editPledgeQuantity',
+  'withdraw'
 ]);
 
 </script>
@@ -83,9 +85,16 @@ const emit = defineEmits([
 
         <button
             v-else
-            class="btn btn-outline-primary btn-sm"
+            class="btn btn-outline-primary btn-sm me-2"
             @click="emit('start-edit', pledge)">
             Edit quantity
+        </button>
+
+        <button
+            class="btn btn-outline-danger btn-sm"
+            :disabled="withdrawingPledgeId === pledge.id"
+            @click="emit('withdraw', pledge)">
+            {{ withdrawingPledgeId === pledge.id ? 'Withdrawing…' : 'Withdraw' }}
         </button>
         </div>
       </div>

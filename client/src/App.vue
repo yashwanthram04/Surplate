@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { onBeforeUnmount,ref, watch } from 'vue';
 import { MotionConfig } from 'motion-v';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import { api } from './api';
@@ -53,6 +53,42 @@ async function refreshAppealCount() {
 watch(() => [session.user?.id, route.fullPath], refreshAppealCount, { immediate: true });
 // <<< REVIEWS FEATURE (end)
 
+// Red badge on "Charity Needs Board": counts charity requests posted since the bakery last looked
+const newNeedCount = ref(0);
+let seenNeedIds = null;
+
+async function refreshNeedCount() {
+  if (!session.isBakery) {
+    newNeedCount.value = 0;
+    return;
+  }
+  try {
+    const { data } = await api.get('/needs');
+    const ids = (data.items ?? data.needs ?? []).map((need) => need.id ?? need._id);
+
+    if (seenNeedIds && route.path !== '/needs') {
+      newNeedCount.value += ids.filter((id) => !seenNeedIds.includes(id)).length;
+    }
+    seenNeedIds = ids;
+  } catch {
+  }
+}
+
+// New login or logout: start counting from scratch
+watch(() => session.user?.id, () => {
+  seenNeedIds = null;
+  newNeedCount.value = 0;
+  refreshNeedCount();
+}, { immediate: true });
+
+// Opening the board clears the badge
+watch(() => route.path, (path) => {
+  if (path === '/needs') newNeedCount.value = 0;
+}, { immediate: true });
+
+const needTimer = setInterval(refreshNeedCount, 30 * 1000);
+onBeforeUnmount(() => clearInterval(needTimer));
+
 async function logout() {
   await session.logout();
   router.push('/');
@@ -81,7 +117,7 @@ async function logout() {
           <li class="nav-item"><RouterLink class="nav-link" to="/browse">Browse food</RouterLink></li>
           <li class="nav-item"><RouterLink class="nav-link" to="/fridges">Community fridges</RouterLink></li>
           <li v-if="session.isBakery || session.isVerifiedCharity" class="nav-item">
-            <RouterLink class="nav-link" to="/needs">Charity Needs Board</RouterLink>
+            <RouterLink class="nav-link" to="/needs">Charity Needs Board<span v-if="newNeedCount" class="badge text-bg-danger ms-1" data-testid="need-count">{{ newNeedCount }}</span></RouterLink>
           </li>
           <template v-if="session.isBakery">
             <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>

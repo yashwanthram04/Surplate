@@ -6,6 +6,10 @@ import User from '../models/User.js';
 import { missedGraceMinutes } from '../config.js';
 import { REPUTATION, punctualityFor } from './reputation.js'; // REVIEWS FEATURE
 
+import { DEFAULT_SLOT_MINUTES, findSlot } from '../utils/slots.js';
+import { canView } from '../utils/visibility.js';
+import { gramsPerMeal } from '../config.js';
+
 export const transaction = (work) => mongoose.connection.transaction(work);
 export const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
 
@@ -125,4 +129,72 @@ export function reservationDTO(doc) {
     createdAt: r.createdAt, collectedAt: r.collectedAt, cancelledAt: r.cancelledAt, missedAt: r.missedAt,
     weightKg: r.quantity * r.weightGramsPerUnit / 1000,
     estimatedMeals: r.quantity * r.weightGramsPerUnit / r.gramsPerMeal };
+}
+
+
+export async function createReservation({ userId, listingId, quantity, slotStart }, session) {
+  const user = await User.findOneAndUpdate(
+    { _id: userId },
+    { $inc: { reservationVersion: 1 } },
+    { returnDocument: 'after', session }
+  );
+
+  if (!user) fail('Account no longer available.', 401);
+
+  const listing = await Listing.findById(listingId).session(session);
+  const now = new Date();
+
+  if (!listing || listing.status !== 'active' || !canView(listing, user)) {
+    fail('Listing not available. It may still be in charity priority.', 404);
+  }
+
+  if (listing.pickupEnd <= now) fail('The pickup window has closed.');
+  if (!listing.weightGramsPerUnit) {
+    fail('The bakery must add a unit weight before this listing can be reserved.');
+  }
+
+  const slot = findSlot(listing, slotStart, now);
+  if (!slot) fail('Choose a collection slot inside the pickup window that has not ended yet.', 422);
+
+  assertCanReserve(await reliabilityFor(user._id, session, now));
+
+  const stock = await Listing.updateOne(
+    {
+      _id: listingId,
+      status: 'active',
+      quantityRemaining: { $gte: quantity },
+      pickupEnd: { $gt: now },
+    },
+    { $inc: { quantityRemaining: -quantity } },
+    { session }
+  );
+
+  if (!stock.modifiedCount) {
+    fail(`Only ${listing.quantityRemaining} left. Choose a smaller quantity.`);
+  }
+
+  const [created] = await Reservation.create(
+    [{
+      listing: listing._id,
+      bakery: listing.bakery,
+      recipient: user._id,
+      bakeryName: listing.bakeryName,
+      recipientName: user.name,
+      recipientRole: user.role,
+      itemName: listing.itemName,
+      address: listing.address,
+      pickupStart: listing.pickupStart,
+      pickupEnd: listing.pickupEnd,
+      slotStart: slot.start,
+      slotEnd: slot.end,
+      slotMinutes: listing.slotMinutes ?? DEFAULT_SLOT_MINUTES,
+      code: await uniqueCode(listing.bakery, session),
+      quantity,
+      weightGramsPerUnit: listing.weightGramsPerUnit,
+      gramsPerMeal: gramsPerMeal(),
+    }],
+    { session }
+  );
+
+  return created;
 }

@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import geocodeRoutes from './routes/geocode.js';
 import listingRoutes from './routes/listings.js';
 import statsRoutes from './routes/stats.js';
+import needRoutes from './routes/needs.js';
 
 import reservationRoutes from './routes/reservations.js';
 import impactRoutes from './routes/impact.js';
@@ -36,10 +37,14 @@ export function createApp() {
   app.use('/api/reservations', reservationRoutes);
   app.use('/api/impact', impactRoutes);
   app.use('/api/fridges', fridgeRoutes);
+
   // >>> REVIEWS FEATURE: ADD these two lines (start)
   app.use('/api/reviews', reviewRoutes);
   app.use('/api/appeals', appealRoutes);
   // <<< REVIEWS FEATURE (end)
+
+  app.use('/api/needs', needRoutes);
+
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
   // In production the built Vue app is served from the same server (index.html at the root).

@@ -151,42 +151,73 @@ router.delete('/:id', requireCharity, loadOwned, async (req, res) => {
 router.post('/:id/pledge', requireBakery, async (req, res) => {
   const { value, errors } = parsePledgeInput(req.body);
   if (Object.keys(errors).length) return invalid(res, errors);
-
-  const pledge = await transaction(async (session) => {
-    const now = new Date();
-    // ONE database step checks "does this still fit?" and adds the quantity. Two bakeries pledging
-    // at the same moment can never push the total past the target.
-    const need = await Need.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        status: 'open',
-        neededBy: { $gt: now },
-        $expr: { $lte: [{ $add: ['$quantityPledged', value.quantity] }, '$quantityTarget'] },
-      },
-      { $inc: { quantityPledged: value.quantity } },
-      { session, returnDocument: 'after' }
-    );
-    if (!need) {
-        const current = await Need.findById(req.params.id).session(session);
-        if (!current) fail('Need not found.', 404);
-        if (current.status !== 'open' || current.neededBy <= now) fail('This need is no longer open.');
-        fail(`Only ${current.quantityTarget - current.quantityPledged} still needed. Pledge that amount or less.`);
-    }
-    
-    if (need.quantityPledged >= need.quantityTarget) {
-        need.set({ status: 'fulfilled', fulfilledAt: now }); // target met: fulfilled automatically
-        await need.save({ session });
-    }
-    
-    const [created] = await Pledge.create([{
-        need: need._id, needTitle: need.title, charity: need.charity, charityName: need.charityName,
-        bakery: req.user._id, bakeryName: req.user.name, quantity: value.quantity,
-    }], { session });
-    return created;
-  });
   
-  res.status(201).json(toPledgeDTO(pledge));
+  const pledge = await transaction(async (session) => {
+  const now = new Date();
+  const need = await Need.findOneAndUpdate(
+    {
+      _id: req.params.id,
+      status: 'open',
+      neededBy: { $gt: now },
+      $expr: {
+          $lte: [
+            { $add: ['$quantityPledged', value.quantity] },
+            '$quantityTarget',
+          ],
+          },
+      },
+        { $inc: { quantityPledged: value.quantity } },
+        { session, returnDocument: 'after' }
+      );
 
-});
+      if (!need) {
+        const current = await Need.findById(req.params.id).session(session);
+
+        if (!current) fail('Need not found.', 404);
+        if (current.status !== 'open' || current.neededBy <= now) {
+          fail('This need is no longer open.');
+        }
+
+        fail(
+          `Only ${current.quantityTarget - current.quantityPledged} still needed. Pledge that amount or less.`
+        );
+      }
+
+      if (need.quantityPledged >= need.quantityTarget) {
+        need.set({ status: 'fulfilled', fulfilledAt: now });
+        await need.save({ session });
+      }
+
+      // Check whether this bakery already has an active pledge for this need.
+      let existingPledge = await Pledge.findOne({
+        need: need._id,
+        bakery: req.user._id,
+        status: 'pledged',
+      }).session(session);
+
+      if (existingPledge) {
+        // Add the new quantity to the existing pledge.
+        existingPledge.quantity += value.quantity;
+        await existingPledge.save({ session });
+
+        return existingPledge;
+      }
+
+      // Otherwise, create a new pledge.
+      const [created] = await Pledge.create([{
+        need: need._id,
+        needTitle: need.title,
+        charity: need.charity,
+        charityName: need.charityName,
+        bakery: req.user._id,
+        bakeryName: req.user.name,
+        quantity: value.quantity,
+      }], { session });
+
+      return created;
+    });
+
+    res.status(201).json(toPledgeDTO(pledge));
+  });
 
 export default router;

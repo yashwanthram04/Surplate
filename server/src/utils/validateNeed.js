@@ -1,6 +1,53 @@
 import { DIETARY_TAGS } from '../models/Listing.js';
 import { toList } from './validate.js';
 
+const FOOD_KEYWORDS = [
+    // Bread and bakery
+    'bread', 'loaf', 'loaves', 'bun', 'buns', 'roll', 'rolls',
+    'croissant', 'pastry', 'pastries', 'cake', 'cakes',
+    'muffin', 'muffins', 'cookie', 'cookies', 'donut',
+    'doughnut', 'bagel', 'baguette', 'tart', 'puff',
+
+    // // Rice and noodles
+    // 'rice', 'noodle', 'vermicelli',
+    // 'beehoon', 'porridge', 'congee',
+
+    // Meals and cooked food
+    'food', 'meal', 'meals', 'lunch', 'dinner', 'breakfast', 'supper',
+    'sandwich', 'sandwiches', 'soup', 'curry', 'dumpling',
+    'dumplings', 'pizza', 'burger', 'burgers',
+
+    // Fruits and vegetables
+    'fruit', 'fruits', 'apple', 'banana', 'orange',
+    'vegetable', 'vegetables', 'carrot', 'potato',
+    'tomato', 'broccoli', 'cabbage', 'lettuce',
+
+    // Meat and seafood
+    'chicken', 'beef', 'pork', 'fish', 'seafood',
+    'prawn', 'prawns', 'shrimp', 'egg', 'eggs',
+
+    // Dairy
+    'milk', 'cheese', 'yoghurt', 'yogurt', 'butter'
+];
+
+function containsFoodKeyword(title) {
+    const words = title.toLowerCase().match(/[a-z]+/g) || [];
+
+    for (let word of words) {
+        if (FOOD_KEYWORDS.includes(word)) {
+            return true;
+        }
+
+        // Allow simple plurals, e.g. apples -> apple
+        if (word.endsWith('s') &&
+            FOOD_KEYWORDS.includes(word.slice(0, -1))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 const MAX_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
 
 function parseNeededBy(value) {
@@ -30,6 +77,8 @@ export function parseNeedInput(body = {}, now = new Date()) {
     value.title = typeof body.title === 'string' ? body.title.trim() : '';
     if (value.title.length < 3 || value.title.length > 100) {
         errors.title = 'Describe what you need in 3–100 characters.';
+    } else if (!containsFoodKeyword(value.title)) {
+        errors.title = 'Please enter a valid food item or meal.';
     }
 
     value.description = typeof body.description === 'string'
