@@ -38,6 +38,48 @@ async function mockGeocode(page) {
 let counter = 0;
 const unique = (name) => `${name} ${Date.now().toString(36)}${counter++}`;
 
+// The app no longer seeds demo fridges, so this file adds its own through the API: five fridges, a status
+// history for each (newest last), and one open spoiled-food report on Sunrise Bakery's first Tiong Bahru drop-off.
+const FRIDGES = [
+  { name: 'Tiong Bahru Community Fridge', openingHours: '24 hours', owner: 'alex', address: '30 SENG POH ROAD', postal: '168898', lat: '1.2866', lng: '103.8326',
+    description: 'Beside the void deck notice board. Please label home-cooked food with the date and keep the area tidy.',
+    updates: [['sunrise', 'stocked', "Left 8 sourdough loaves from today's bake."], ['alex', 'low', 'Only a few items left this afternoon.'], ['sunrise', 'stocked', 'Dropped off 12 croissants and a tray of egg tarts.']] },
+  { name: 'Bugis Neighbourhood Fridge', openingHours: 'Mon–Sat 9am–8pm', owner: 'hope', address: '1 BUGIS STREET', postal: '188868', lat: '1.3', lng: '103.8559',
+    description: 'Under the covered walkway, next to the bus stop. Take what you need, leave what you can.',
+    updates: [['hope', 'low', 'Running low on sandwiches and drinks. Donations welcome.']] },
+  { name: 'Tampines Hub Fridge', openingHours: 'Daily 8am–10pm', owner: 'alex', address: '1 TAMPINES WALK OUR TAMPINES HUB', postal: '528523', lat: '1.3541', lng: '103.9406',
+    description: 'Next to the community kitchen on level 1.', updates: [['alex', 'empty', 'Completely empty at lunchtime.']] },
+  { name: 'Toa Payoh Lorong 4 Fridge', openingHours: '24 hours', owner: 'admin', address: '77 LORONG 4 TOA PAYOH', postal: '310077', lat: '1.3396', lng: '103.8478',
+    description: 'Bakeries nearby drop bread here in the evening.', updates: [['crumb', 'stocked', 'Dropped off 15 loaves of vegan banana bread.']] },
+  // No updates: shows how an unknown status looks.
+  { name: 'Jurong West Community Fridge', openingHours: 'Daily 7am–9pm', owner: 'hope', address: '1 JURONG WEST CENTRAL 2', postal: '648886', lat: '1.3404', lng: '103.7068',
+    description: 'Beside the market on the ground floor.', updates: [] },
+];
+
+test.beforeAll(async ({ playwright }, testInfo) => {
+  const api = await playwright.request.newContext({ baseURL: testInfo.project.use.baseURL });
+  const ok = async (res, what) => { expect(res.ok(), what).toBe(true); return res.json(); };
+  const as = async (who) => ok(await api.post('/api/auth/login', { data: { email: EMAILS[who], password: 'demo1234' } }), `login as ${who}`);
+  // A failed test restarts the worker and reruns this hook against the same server, so only add them once.
+  const existing = (await ok(await api.get('/api/fridges'), 'list fridges')).items.map((f) => f.name);
+  if (!existing.includes(FRIDGES[0].name)) {
+    let firstDrop;
+    for (const { owner, updates, ...fields } of FRIDGES) {
+      await as(owner);
+      const { id } = await ok(await api.post('/api/fridges', { multipart: fields }), `create ${fields.name}`);
+      for (const [who, status, note] of updates) {
+        await as(who);
+        const update = await ok(await api.post(`/api/fridges/${id}/updates`, { multipart: { status, note } }), `post ${status} at ${fields.name}`);
+        firstDrop ??= { fridgeId: id, updateId: update.id };
+        await new Promise((r) => setTimeout(r, 20)); // keep the history in order
+      }
+    }
+    await as('alex');
+    await ok(await api.post(`/api/fridges/${firstDrop.fridgeId}/spoiled`, { multipart: { items: 'Sourdough loaves', note: 'Two of the loaves had gone mouldy.', updateId: firstDrop.updateId } }), 'flag sourdough');
+  }
+  await api.dispose();
+});
+
 async function createFridge(page, who, name) {
   await actAs(page, who);
   const res = await page.request.post('/api/fridges', {
@@ -73,7 +115,7 @@ async function alertsLoaded(page) {
 
 // ======================================================================================================
 test.describe('browsing the map (no login needed)', () => {
-  test('lists the demo fridges with their latest status and last-updated time', async ({ page }) => {
+  test('lists the fridges with their latest status and last-updated time', async ({ page }) => {
     await page.goto('/fridges');
     await expect(page.getByRole('heading', { name: 'Community fridges', level: 1 })).toBeVisible();
 
@@ -81,13 +123,10 @@ test.describe('browsing the map (no login needed)', () => {
     await expect(tiong.getByTestId('fridge-status')).toHaveText('Stocked');
     await expect(tiong.getByTestId('last-updated')).toContainText(/Updated (just now|.+ ago)/);
     await expect(tiong).toContainText('Dropped off 12 croissants'); // the note from the newest update
-    await expect(tiong.getByTestId('spoiled-pill')).toContainText('Spoiled food reported'); // demo data has one open report
+    await expect(tiong.getByTestId('spoiled-pill')).toContainText('Spoiled food reported'); // beforeAll adds one open report
 
     await expect(fridgeCard(page, 'Bugis Neighbourhood Fridge').getByTestId('fridge-status')).toHaveText('Running low');
-
-    const tampines = fridgeCard(page, 'Tampines Hub Fridge');
-    await expect(tampines.getByTestId('fridge-status')).toHaveText('Empty');
-    await expect(tampines.getByTestId('last-updated')).toContainText('may be out of date'); // its last update is over a day old
+    await expect(fridgeCard(page, 'Tampines Hub Fridge').getByTestId('fridge-status')).toHaveText('Empty');
 
     const jurong = fridgeCard(page, 'Jurong West Community Fridge');
     await expect(jurong.getByTestId('fridge-status')).toHaveText('No updates yet');
@@ -106,12 +145,12 @@ test.describe('browsing the map (no login needed)', () => {
 
   test('clicking a pin opens a popup with the status, and links to the fridge page', async ({ page }) => {
     await page.goto('/fridges');
-    // Tampines is far from every other demo fridge, so its pin can't be overlapped by a neighbour's.
+    // Tampines is far from every other fridge, so its pin can't be overlapped by a neighbour's.
     await pin(page, 'Tampines Hub Fridge').click();
     const popup = page.locator('.leaflet-popup-content');
     await expect(popup).toContainText('Tampines Hub Fridge');
     await expect(popup).toContainText('Empty');
-    await expect(popup).toContainText(/Updated .+ ago/);
+    await expect(popup).toContainText(/Updated (just now|.+ ago)/);
     await popup.getByRole('link', { name: 'See details' }).click();
     await expect(page).toHaveURL(/\/fridges\/[0-9a-f]{24}$/);
     await expect(page.getByTestId('fridge-title')).toHaveText('Tampines Hub Fridge');
@@ -189,9 +228,9 @@ test.describe('browsing the map (no login needed)', () => {
     await expect(page.locator('dl')).toContainText('24 hours');
     await expect(page.locator('dl')).toContainText('30 SENG POH ROAD');
     await expect(page.getByTestId('fridge-map')).toBeVisible();
-    await expect(page.getByTestId('spoiled-warning')).toBeVisible(); // the demo report is still open
+    await expect(page.getByTestId('spoiled-warning')).toBeVisible(); // the beforeAll report is still open
 
-    // history, newest first (the demo data has three updates here)
+    // history, newest first (beforeAll posts three updates here)
     const items = page.getByTestId('update-item');
     await expect(items).toHaveCount(3);
     await expect(items.first()).toContainText('Sunrise Bakery');
@@ -517,7 +556,7 @@ test.describe('flagging spoiled food and notifying suppliers', () => {
     await expect(dialog).toBeHidden();
   });
 
-  test('the demo bakery sees the demo alert, other bakeries do not, and admins see everything', async ({ page }) => {
+  test('the bakery sees the alert about its drop-off, other bakeries do not, and admins see everything', async ({ page }) => {
     await actAs(page, 'sunrise');
     await page.goto('/spoiled-alerts');
     await alertsLoaded(page);
