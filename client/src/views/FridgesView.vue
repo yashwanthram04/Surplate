@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
@@ -7,8 +7,11 @@ import FridgeBackdrop from '../components/FridgeBackdrop.vue';
 import FridgeBanner from '../components/FridgeBanner.vue';
 import FridgeCard from '../components/FridgeCard.vue';
 import FridgeMascot from '../components/FridgeMascot.vue';
+import FridgeMagnets from '../components/FridgeMagnets.vue';
 import FridgeMap from '../components/FridgeMap.vue';
-import { useCountUp, useMarquee, useScrollSkew, useSmoothScroll, vMagnetic, vReveal } from '../composables/useFridgeMotion'; // ✨ NEW
+import FridgeStickyBar from '../components/FridgeStickyBar.vue';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useCountUp, useScrollSkew, useSmoothScroll, vMagnetic, vReveal } from '../composables/useFridgeMotion'; // ✨ NEW
 import { useSession } from '../stores/session';
 import { FRIDGE_STATUSES, statusMeta } from '../utils/fridge';
 
@@ -102,15 +105,24 @@ useSmoothScroll();
 const shownTotal = useCountUp(() => items.value.length);
 const shownStocked = useCountUp(() => items.value.filter((f) => f.latestStatus === 'stocked').length);
 const shownNeedy = useCountUp(() => items.value.filter((f) => f.latestStatus === 'low' || f.latestStatus === 'empty').length);
-// two crossing tapes under the banner, running opposite ways
-const ribbonFront = ref(null);
-const ribbonBack = ref(null);
-const frontItems = ['🥖 Take what you need', '🥗 Leave what you can', '🍎 Free food, any time', '🥐 No reservation needed', '💚 Check the date, trust your nose'];
-const backItems = ['Free food', 'Take one', 'Leave one', 'Share more', 'Waste less'];
-const frontLoop = [...frontItems, ...frontItems, ...frontItems];
-const backLoop = [...backItems, ...backItems, ...backItems, ...backItems];
-useMarquee(ribbonFront, { speed: 1.3 });
-useMarquee(ribbonBack, { speed: 1, reverse: true });
+// once the banner has scrolled away, a slim bar with the same counts slides in under the navbar
+const heroCol = ref(null);
+const barOn = ref(false);
+let heroWatch = null;
+onMounted(() => {
+  heroWatch = ScrollTrigger.create({
+    trigger: heroCol.value,
+    start: 'bottom top+=96',
+    onEnter: () => (barOn.value = true),
+    onLeaveBack: () => (barOn.value = false),
+  });
+});
+onBeforeUnmount(() => heroWatch?.kill());
+const barStats = computed(() => [
+  { value: shownTotal.value, label: 'shown' },
+  { value: shownStocked.value, label: 'ready' },
+  { value: shownNeedy.value, label: 'need a refill' },
+]);
 const cardGrid = ref(null);
 useScrollSkew(cardGrid);
 // the mascot is happy when most fridges are stocked, worried when more need a refill
@@ -120,8 +132,9 @@ const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.f
 <template>
   <div class="row g-4">
     <FridgeBackdrop />
-    <div class="col-12">
-      <FridgeBanner title="Community fridges" :mood="heroMood">
+    <FridgeStickyBar :show="barOn" title="Community fridges" :mood="heroMood" :stats="barStats" />
+    <div ref="heroCol" class="col-12">
+      <FridgeBanner title="Community fridges" :mood="heroMood" :fridges="items">
         <p class="mb-3">Free food, any time of day. Take what you need, leave what you can. No listing or reservation needed.</p>
         <div class="d-inline-block">
           <RouterLink v-magnetic :to="{ name: 'fridge-new' }" class="btn btn-sticker" data-testid="add-fridge">
@@ -136,18 +149,7 @@ const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.f
       </FridgeBanner>
     </div>
 
-    <div class="col-12 fridge-ribbons" aria-hidden="true">
-      <div class="fridge-ribbon rb-back">
-        <div ref="ribbonBack" class="rb-track">
-          <div v-for="n in 2" :key="n" class="rb-half"><span v-for="(t, i) in backLoop" :key="i" class="rb-item">{{ t }}</span></div>
-        </div>
-      </div>
-      <div class="fridge-ribbon rb-front">
-        <div ref="ribbonFront" class="rb-track">
-          <div v-for="n in 2" :key="n" class="rb-half"><span v-for="(t, i) in frontLoop" :key="i" class="rb-item">{{ t }}</span></div>
-        </div>
-      </div>
-    </div>
+    <div class="col-12"><FridgeMagnets /></div>
 
     <div class="col-12 d-lg-none">
       <div class="btn-group w-100" role="group" aria-label="Show list or map">

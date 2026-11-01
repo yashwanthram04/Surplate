@@ -42,7 +42,6 @@ function stopLenis() {
 }
 
 export const getScrollVelocity = () => lenis?.velocity ?? 0;
-export const getScrollDirection = () => (lenis?.direction === -1 ? -1 : 1);
 export function useSmoothScroll() {
   onMounted(startLenis);
   onBeforeUnmount(stopLenis);
@@ -85,9 +84,11 @@ export const vParallax = {
   },
 };
 
+// v-tilt="6" tilts up to 6° each way (default 12°); big cards look better with less.
 export const vTilt = {
-  mounted(el) {
+  mounted(el, binding) {
     if (prefersReducedMotion() || !canHover()) return;
+    const max = Number(binding.value) || 12;
     gsap.set(el, { transformPerspective: 800 });
     const rx = gsap.quickTo(el, 'rotationX', { duration: 0.45, ease: 'power3.out' });
     const ry = gsap.quickTo(el, 'rotationY', { duration: 0.45, ease: 'power3.out' });
@@ -96,9 +97,9 @@ export const vTilt = {
       const r = el.getBoundingClientRect();
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
-      ry(px * 12);
-      rx(-py * 12);
-      lift(-8);
+      ry(px * max);
+      rx(-py * max);
+      lift(-max * 0.66);
     };
     const leave = () => {
       rx(0);
@@ -114,6 +115,103 @@ export const vTilt = {
     el.removeEventListener('pointermove', el._tilt.move);
     el.removeEventListener('pointerleave', el._tilt.leave);
     gsap.killTweensOf(el);
+  },
+};
+
+// A glossy highlight that follows the pointer. Needs a `.panel-glare` child; it reads --gx/--gy.
+export const vGlare = {
+  mounted(el) {
+    if (prefersReducedMotion() || !canHover()) return;
+    const move = (e) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--gx', `${((e.clientX - r.left) / r.width) * 100}%`);
+      el.style.setProperty('--gy', `${((e.clientY - r.top) / r.height) * 100}%`);
+      el.classList.add('is-glaring');
+    };
+    const leave = () => el.classList.remove('is-glaring');
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerleave', leave);
+    el._glare = { move, leave };
+  },
+  unmounted(el) {
+    if (!el._glare) return;
+    el.removeEventListener('pointermove', el._glare.move);
+    el.removeEventListener('pointerleave', el._glare.leave);
+  },
+};
+
+// The photo opens like a fridge door: a door panel (`.fridge-door`) swings open on its left hinge
+// and the cold light behind it (`.fridge-door-glow`) fades. Both stay hidden when motion is reduced.
+export const vDoor = {
+  mounted(el) {
+    if (prefersReducedMotion()) return;
+    const door = el.querySelector('.fridge-door');
+    const glow = el.querySelector('.fridge-door-glow');
+    if (!door) return;
+    el._door = gsap
+      .timeline({ delay: 0.25 })
+      .set([door, glow], { autoAlpha: 1 })
+      .set(door, { transformOrigin: '0% 50%', transformPerspective: 1400 })
+      .to(door, { rotationY: -112, duration: 1.15, ease: 'power2.inOut' })
+      .to(glow, { autoAlpha: 0, duration: 1.1, ease: 'power1.out' }, 0.55)
+      .set(door, { autoAlpha: 0, clearProps: 'transform' });
+  },
+  unmounted(el) {
+    el._door?.kill();
+  },
+};
+
+// Status history: one rail draws down the timeline, its tip following the line 90% down the screen, so
+// everything already on screen is drawn at load and the rest draws in as you scroll. Each dot pops in
+// (with a ripple) when the rail reaches it. Without this (reduced motion) the static line segments show.
+export const vTimeline = {
+  mounted(el) {
+    if (prefersReducedMotion()) return;
+    const rail = el.querySelector('.timeline-rail');
+    const list = el.querySelector('.timeline');
+    if (!rail || !list) return;
+    el.classList.add('is-drawn');
+    const DOT = 1.2 * 16 + 0.425 * 16; // centre of an item's dot from its top (see .update-item::before)
+    const state = { p: 0 };
+    let reached = 0; // the rail only ever grows
+    let height = 0;
+    let top = 0;
+
+    // offsetTop is relative to `el` (position: relative), the same box the rail is placed in
+    const layout = () => {
+      const items = [...list.children];
+      top = items.length ? items[0].offsetTop + DOT : 0;
+      height = items.length ? items[items.length - 1].offsetTop + DOT - top : 0;
+      rail.style.top = `${top}px`;
+      rail.style.height = `${height}px`;
+    };
+    const paint = () => {
+      rail.style.transform = `scaleY(${state.p})`;
+      const drawn = state.p * height;
+      for (const li of list.children) li.classList.toggle('dot-on', state.p > 0 && li.offsetTop + DOT - top <= drawn + 2);
+    };
+    const grow = gsap.quickTo(state, 'p', { duration: 0.7, ease: 'power2.out', onUpdate: paint });
+    const measure = () => {
+      layout();
+      if (!list.children.length) return;
+      const railTop = el.getBoundingClientRect().top + top;
+      const line = window.innerHeight * 0.9;
+      const target = height > 0 ? gsap.utils.clamp(0, 1, (line - railTop) / height) : railTop <= line ? 1 : 0;
+      reached = Math.max(reached, target);
+      grow(reached);
+      paint();
+    };
+
+    el._timeline = { measure };
+    el._timelineST = ScrollTrigger.create({ trigger: list, start: 'top bottom', end: 'bottom top', onUpdate: measure, onRefresh: measure });
+    requestAnimationFrame(measure);
+  },
+  updated(el) {
+    // re-measure after any re-render (a new update posted, older ones loaded, photos changing height)
+    if (el._timeline) requestAnimationFrame(el._timeline.measure);
+  },
+  unmounted(el) {
+    el._timelineST?.kill();
   },
 };
 
@@ -183,27 +281,6 @@ export function burst(origin, emojis = ['🥖', '🥗', '🍎', '🎉', '💚', 
   }
 }
 
-export function useMarquee(track, { speed = 1.2, reverse = false } = {}) {
-  let step = null;
-  onMounted(() => {
-    if (prefersReducedMotion() || !track.value) return;
-    const setX = gsap.quickSetter(track.value, 'xPercent');
-    const wrap = gsap.utils.wrap(-50, 0);
-    let x = reverse ? -50 : 0;
-    let boost = 0;
-    step = (_time, deltaMs) => {
-      boost += (Math.min(Math.abs(getScrollVelocity()), 60) / 5 - boost) * 0.08;
-      const dir = (reverse ? 1 : -1) * getScrollDirection();
-      x = wrap(x + dir * speed * (1 + boost) * (deltaMs / 1000));
-      setX(x);
-    };
-    gsap.ticker.add(step);
-  });
-  onBeforeUnmount(() => {
-    if (step) gsap.ticker.remove(step);
-  });
-}
-
 export function useScrollSkew(target, max = 5) {
   let step = null;
   onMounted(() => {
@@ -223,6 +300,16 @@ export function useScrollSkew(target, max = 5) {
     if (step) gsap.ticker.remove(step);
     if (target.value) gsap.killTweensOf(target.value);
   });
+}
+
+// a full spin with a little grow, then it settles back with a wobble
+export function spin(el) {
+  if (prefersReducedMotion() || !el || gsap.isTweening(el)) return;
+  gsap
+    .timeline()
+    .to(el, { rotation: 360, scale: 1.3, duration: 0.7, ease: 'back.out(1.4)' })
+    .to(el, { scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.4)' }, '-=0.15')
+    .set(el, { rotation: 0, clearProps: 'transform' });
 }
 
 export function hop(el) {
@@ -249,7 +336,13 @@ export function useHeroIntro(root) {
 
       gsap
         .timeline({ defaults: { clearProps: 'transform,opacity' } })
-        .from(el, { scale: 0.88, rotation: -2.5, opacity: 0, duration: 0.8, ease: 'back.out(1.8)' })
+        // the banner is a fridge door: it swings shut on its left hinge, lands with a small thunk,
+        // the frost on the glass melts back to the edges and light runs down the handle
+        .from(el, { rotationY: -24, transformPerspective: 1800, transformOrigin: '0% 50%', opacity: 0, duration: 0.7, ease: 'power3.in', clearProps: '' })
+        .to(el, { scaleY: 0.985, y: 3, duration: 0.07, ease: 'power1.out', clearProps: '' })
+        .to(el, { scaleY: 1, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.45)' })
+        .fromTo('.hero-frost', { opacity: 1 }, { opacity: 0.45, duration: 1.8, ease: 'power2.out', clearProps: 'opacity' }, 0.55)
+        .fromTo('.hero-handle', { '--glint': '-60%' }, { '--glint': '160%', duration: 0.9, ease: 'power2.inOut', clearProps: '--glint' }, 0.7)
         .from(chars, { yPercent: -260, rotation: () => R(-70, 70), opacity: 0, duration: 1.1, ease: 'bounce.out', stagger: { each: 0.04, from: 'random' } }, 0.15)
         .from('.hero-copy > :not(h1)', { y: 34, scale: 0.85, opacity: 0, duration: 0.75, ease: 'back.out(2.2)', stagger: 0.12 }, 0.75)
         .from('.hero-rays', { scale: 0, opacity: 0, duration: 1.4, ease: 'expo.out', clearProps: 'opacity' }, 0.3)

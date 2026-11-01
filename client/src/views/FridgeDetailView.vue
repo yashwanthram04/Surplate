@@ -10,7 +10,7 @@ import FridgeStatusBadge from '../components/FridgeStatusBadge.vue';
 import FridgeStatusForm from '../components/FridgeStatusForm.vue';
 import SpoiledFlagModal from '../components/SpoiledFlagModal.vue';
 import { now } from '../composables/useNow';
-import { burst, hop, useSmoothScroll, vParallax, vReveal } from '../composables/useFridgeMotion';
+import { burst, hop, spin, useSmoothScroll, vDoor, vGlare, vParallax, vReveal, vTilt, vTimeline } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 import { isStale, timeAgo } from '../utils/fridge';
 import { formatDateTime } from '../utils/time';
@@ -30,6 +30,12 @@ const statusPanel = ref(null);
 const statusMascot = ref(null);
 const CONFETTI = { stocked: ['🥖', '🥗', '🍎', '🎉', '💚', '✨'], low: ['🍞', '💛', '✨'], empty: ['💧', '😢'] };
 const confetti = (status) => burst(statusPanel.value?.querySelector('[data-testid="fridge-status"]') ?? statusPanel.value, CONFETTI[status] ?? CONFETTI.stocked);
+// the little mascot beside each history item: click it and it spins, throwing confetti for that status
+function pokeUpdateMascot(event, status) {
+  const mascot = event.currentTarget.querySelector('.mc');
+  spin(mascot);
+  burst(mascot, CONFETTI[status] ?? CONFETTI.stocked);
+}
 const flash = ref(route.query.added ? 'Thanks! The fridge is on the map. Post a status update so people know what is inside.' : route.query.updated ? 'Your changes have been saved.' : '');
 
 const updates = ref([]);
@@ -147,7 +153,11 @@ async function remove() {
 
       <div class="row g-4 mt-1">
         <div class="col-12 col-lg-7">
-          <div v-if="fridge.photoUrl" class="fridge-media"><img v-parallax="8" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" /></div>
+          <div v-if="fridge.photoUrl" v-door class="fridge-media">
+            <img v-parallax="8" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" />
+            <span class="fridge-door-glow" aria-hidden="true"></span>
+            <span class="fridge-door" aria-hidden="true"><span class="fridge-door-handle"></span></span>
+          </div>
           <div v-else class="photo-placeholder rounded-4" aria-hidden="true">🧊</div>
           <div v-if="fridge.description" class="mt-3">
             <h2 class="h6">About this fridge</h2>
@@ -158,8 +168,14 @@ async function remove() {
             <h2 id="history-title" class="h5">Status history</h2>
             <div v-if="updatesError" class="alert alert-danger py-2" role="alert">{{ updatesError }} <button class="btn btn-sm btn-outline-danger ms-2" @click="loadUpdates(true)">Retry</button></div>
             <p v-else-if="!updates.length && !loadingMore" class="text-body-secondary" data-testid="no-updates">Nobody has posted an update yet. Be the first!</p>
+            <div v-timeline class="timeline-wrap">
+            <span class="timeline-rail" aria-hidden="true"></span>
             <ul class="update-list timeline" data-testid="update-list">
-              <li v-for="(u, i) in updates" :key="u.id" v-reveal="i" class="update-item" :class="`status-${u.status}`" data-testid="update-item">
+              <li v-for="(u, i) in updates" :key="u.id" class="update-item" :class="`status-${u.status}`" data-testid="update-item">
+                <!-- a toy for mouse users: it repeats what the badge says, so it's hidden from screen readers and skipped by Tab -->
+                <button type="button" class="update-mascot" tabindex="-1" aria-hidden="true" title="Poke me!" :style="{ '--float-delay': `${(i % 4) * -0.9}s` }" @click="pokeUpdateMascot($event, u.status)">
+                  <FridgeMascot :mood="u.status" :size="46" />
+                </button>
                 <div class="d-flex flex-wrap align-items-center gap-2">
                   <FridgeStatusBadge :status="u.status" />
                   <span class="small text-body-secondary" :title="formatDateTime(u.createdAt)">
@@ -173,6 +189,7 @@ async function remove() {
                 </button>
               </li>
             </ul>
+            </div>
             <button v-if="nextBefore" type="button" class="btn btn-outline-secondary btn-sm" :disabled="loadingMore" @click="loadUpdates()">
               <span v-if="loadingMore" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Show older updates
             </button>
@@ -181,7 +198,12 @@ async function remove() {
 
         <!-- right: current status, details, actions -->
         <div class="col-12 col-lg-5">
-          <div ref="statusPanel" v-reveal class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${fridge.latestStatus || 'unknown'}`">
+          <!-- v-reveal on the wrapper so its entrance never fights the tilt on the card -->
+          <div v-reveal>
+          <div ref="statusPanel" v-tilt="5" v-glare class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${fridge.latestStatus || 'unknown'}`">
+            <span class="panel-mood" aria-hidden="true">
+              <template v-if="fridge.latestStatus === 'empty'"><span v-for="n in 7" :key="n" class="flake" :class="`fl${n}`">❄</span></template>
+            </span>
             <FridgeMascot ref="statusMascot" class="status-mascot" :mood="fridge.latestStatus || 'unknown'" :size="92" />
             <div class="text-body-secondary small">Community fridge</div>
             <h1 class="h3 mb-3 fridge-title" data-testid="fridge-title">{{ fridge.name }}</h1>
@@ -207,6 +229,8 @@ async function remove() {
               <RouterLink :to="{ name: 'fridge-edit', params: { id: fridge.id } }" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</RouterLink>
               <button type="button" class="btn btn-outline-danger btn-sm" data-testid="remove-fridge" @click="confirmRemove = true"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button>
             </div>
+            <span class="panel-glare" aria-hidden="true"></span>
+          </div>
           </div>
 
           <div v-reveal class="bg-white border rounded-4 p-4 mt-4 fridge-panel">
