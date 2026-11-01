@@ -3,13 +3,15 @@ import { onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import { now } from '../composables/useNow';
+import { useSmoothScroll, vReveal } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 import { timeAgo } from '../utils/fridge';
 
 // Spoiled-food reports. Bakeries see the reports sent to them (they dropped the food off);
 // admins see every report, including ones no supplier could be matched to.
 const session = useSession();
-const tab = ref('open'); // open | resolved
+useSmoothScroll();
+const tab = ref('open');
 const items = ref([]);
 const loading = ref(true);
 const error = ref('');
@@ -85,7 +87,7 @@ async function resolve(report) {
     </div>
 
     <div v-else class="d-flex flex-column gap-3">
-      <article v-for="r in items" :key="r.id" class="bg-white border rounded-4 p-3 p-md-4" data-testid="alert-card">
+      <article v-for="(r, i) in items" :key="r.id" v-reveal="i" class="bg-white border rounded-4 p-3 p-md-4 alert-card" :class="{ 'is-resolved': r.status === 'resolved' }" data-testid="alert-card">
         <div class="d-flex flex-wrap justify-content-between gap-2">
           <h2 class="h6 mb-0">{{ r.items }}</h2>
           <span class="small text-body-secondary">{{ timeAgo(r.createdAt, now) }}</span>

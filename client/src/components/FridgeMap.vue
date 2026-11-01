@@ -6,15 +6,13 @@ import { SG_CENTER } from '../constants';
 import { statusMeta, timeAgo } from '../utils/fridge';
 import '../fridges.css';
 
-// Leaflet map of community fridges: one pin each, coloured by its latest status. Tiles come from OneMap.
-// Modelled on ListingMap.vue.
 const props = defineProps({
-  fridges: { type: Array, default: () => [] }, // needs id, name, lat, lng, latestStatus, latestUpdateAt
+  fridges: { type: Array, default: () => [] },
   highlightId: { type: String, default: null },
-  center: { type: Object, default: null }, // { lat, lng } of the searcher (blue dot + radius)
+  center: { type: Object, default: null },
   radiusKm: { type: Number, default: 0 },
-  linkable: { type: Boolean, default: true }, // popups link to the fridge page
-  active: { type: Boolean, default: true }, // flips to true when a hidden map becomes visible
+  linkable: { type: Boolean, default: true },
+  active: { type: Boolean, default: true },
 });
 
 const router = useRouter();
@@ -36,7 +34,7 @@ function popupFor(f) {
   box.append(title);
 
   const status = document.createElement('div');
-  status.className = 'fridge-popup-badge mt-1';
+  status.className = `fridge-popup-badge mt-1 status-${f.latestStatus ?? 'unknown'}`; // coloured by status
   status.textContent = statusMeta(f.latestStatus).label;
   box.append(status);
 
@@ -62,17 +60,20 @@ function popupFor(f) {
 function drawFridges() {
   pinLayer.clearLayers();
   pins.clear();
+  // pins "drop in" only when the set of fridges changed, not on the 60 s refresh
+  const fresh = props.fridges.map((f) => f.id).sort().join(',') !== lastFitKey.split('|')[0];
+  let order = 0;
   for (const f of props.fridges) {
     const status = f.latestStatus ?? 'unknown';
     const icon = L.divIcon({
       className: '',
-      html: `<div class="pin fridge-pin status-${status}"><span>${statusMeta(status).glyph}</span></div>`,
+      html: `<div class="pin fridge-pin status-${status}${fresh ? ' pin-in' : ''}" style="--d:${Math.min(order++, 12) * 45}ms"><span>${statusMeta(status).glyph}</span></div>`,
       iconSize: [34, 34],
       iconAnchor: [17, 34],
       popupAnchor: [0, -32],
     });
     const marker = L.marker([f.lat, f.lng], { icon, title: `${f.name}: ${statusMeta(status).label}`, keyboard: true });
-    marker.bindPopup(() => popupFor(f));
+    marker.bindPopup(() => popupFor(f), { className: 'fridge-popup' }); //className = rounded popup style
     marker.addTo(pinLayer);
     pins.set(f.id, marker);
   }
@@ -109,7 +110,6 @@ function applyHighlight() {
 }
 
 onMounted(() => {
-  // zoomAnimation off: a zoom animation still running when the map is destroyed (route change) throws inside Leaflet.
   map = L.map(el.value, { center: SG_CENTER, zoom: 12, minZoom: 10, maxZoom: 19, scrollWheelZoom: true, zoomAnimation: false });
   L.tileLayer('https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png', { maxZoom: 19, attribution: ONEMAP_ATTRIBUTION }).addTo(map);
   pinLayer = L.layerGroup().addTo(map);
@@ -126,7 +126,6 @@ watch(() => [props.center, props.radiusKm], () => {
   fitIfNeeded();
 });
 watch(() => props.highlightId, applyHighlight);
-// A map created inside a hidden tab has size 0; recompute once it's shown.
 watch(() => props.active, (a) => {
   if (!a || !map) return;
   setTimeout(() => {

@@ -1,15 +1,14 @@
 <script setup>
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
 import FridgeCard from '../components/FridgeCard.vue';
 import FridgeMap from '../components/FridgeMap.vue';
+import { useHeroIntro, useCountUp, useSmoothScroll, vReveal } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 import { FRIDGE_STATUSES, statusMeta } from '../utils/fridge';
 
-// The community fridge map: interactive map on one side, filterable list on the other.
-// Modelled on BrowseView.vue. Anyone can browse, logged in or not.
 const session = useSession();
 const blankFilters = () => ({ q: '', status: [], near: null, radiusKm: 5, sort: 'recent' });
 const filters = ref(blankFilters());
@@ -95,18 +94,35 @@ function clearAll() {
   geoError.value = '';
   filters.value = blankFilters();
 }
+
+useSmoothScroll();
+const heroEl = ref(null);
+useHeroIntro(heroEl);
+const shownTotal = useCountUp(() => items.value.length);
+const shownStocked = useCountUp(() => items.value.filter((f) => f.latestStatus === 'stocked').length);
+const shownNeedy = useCountUp(() => items.value.filter((f) => f.latestStatus === 'low' || f.latestStatus === 'empty').length);
 </script>
 
 <template>
   <div class="row g-4">
-    <div class="col-12 d-flex flex-wrap justify-content-between align-items-start gap-2">
-      <div>
-        <h1 class="h3 mb-1">Community fridges</h1>
-        <p class="text-body-secondary mb-0">Free food, any time of day. Take what you need, leave what you can. No listing or reservation needed.</p>
-      </div>
-      <RouterLink :to="{ name: 'fridge-new' }" class="btn btn-primary" data-testid="add-fridge">
-        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a fridge
-      </RouterLink>
+    <div ref="heroEl" class="col-12">
+      <section class="fridge-hero" aria-label="About community fridges">
+        <span class="hero-float f1" aria-hidden="true">🥖</span>
+        <span class="hero-float f2" aria-hidden="true">🥗</span>
+        <span class="hero-float f3" aria-hidden="true">🍎</span>
+        <div class="position-relative">
+          <h1 class="h2 mb-2 hero-fx-title">Community fridges</h1>
+          <p class="mb-3 hero-fx-sub">Free food, any time of day. Take what you need, leave what you can. No listing or reservation needed.</p>
+          <RouterLink :to="{ name: 'fridge-new' }" class="btn btn-light hero-fx-action" data-testid="add-fridge">
+            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a fridge
+          </RouterLink>
+          <div class="hero-stats">
+            <div class="hero-stat"><strong>{{ shownTotal }}</strong><span>Fridges shown</span></div>
+            <div class="hero-stat"><strong>{{ shownStocked }}</strong><span>Ready to take from</span></div>
+            <div class="hero-stat"><strong>{{ shownNeedy }}</strong><span>Need a refill</span></div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- List / map toggle for small screens -->
@@ -118,7 +134,7 @@ function clearAll() {
     </div>
 
     <div class="col-12 col-lg-7 col-xxl-8 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'map' }">
-      <section class="bg-white border rounded-4 p-3 mb-3" aria-label="Filters">
+      <section class="bg-white border rounded-4 p-3 mb-3 fridge-filters" aria-label="Filters">
         <div class="row g-2 align-items-end">
           <div class="col-12 col-md-8">
             <label for="fr-q" class="form-label small fw-semibold mb-1">Search</label>
@@ -139,7 +155,7 @@ function clearAll() {
           <div class="d-flex flex-wrap gap-1" role="group" aria-labelledby="fr-status-label">
             <template v-for="s in [...FRIDGE_STATUSES, 'unknown']" :key="s">
               <input :id="`fr-status-${s}`" class="btn-check chip-check" type="checkbox" :checked="filters.status.includes(s)" @change="toggleStatus(s)" />
-              <label class="btn btn-outline-secondary chip" :for="`fr-status-${s}`"><i class="bi me-1" :class="statusMeta(s).icon" aria-hidden="true"></i>{{ statusMeta(s).label }}</label>
+              <label class="btn btn-outline-secondary chip" :class="`chip-${s}`" :for="`fr-status-${s}`"><i class="bi me-1" :class="statusMeta(s).icon" aria-hidden="true"></i>{{ statusMeta(s).label }}</label>
             </template>
           </div>
         </div>
@@ -193,14 +209,14 @@ function clearAll() {
       </div>
 
       <div v-else class="row g-3">
-        <div v-for="f in items" :key="f.id" class="col-12 col-md-6 col-xxl-4">
+        <div v-for="(f, i) in items" :key="f.id" v-reveal="i" class="col-12 col-md-6 col-xxl-4">
           <FridgeCard :fridge="f" :highlighted="hoverId === f.id" @hover="hoverId = $event" />
         </div>
       </div>
     </div>
 
     <div class="col-12 col-lg-5 col-xxl-4 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'list' }">
-      <div class="map-sticky">
+      <div class="map-sticky fridge-map-wrap">
         <FridgeMap :fridges="items" :highlight-id="hoverId" :center="filters.near" :radius-km="filters.near ? filters.radiusKm : 0" :active="view === 'map'" />
       </div>
     </div>

@@ -8,6 +8,7 @@ import FridgeStatusBadge from '../components/FridgeStatusBadge.vue';
 import FridgeStatusForm from '../components/FridgeStatusForm.vue';
 import SpoiledFlagModal from '../components/SpoiledFlagModal.vue';
 import { now } from '../composables/useNow';
+import { useSmoothScroll, vParallax, vReveal } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 import { isStale, timeAgo } from '../utils/fridge';
 import { formatDateTime } from '../utils/time';
@@ -16,6 +17,7 @@ const props = defineProps({ id: { type: String, required: true } });
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
+useSmoothScroll();
 
 const fridge = ref(null);
 const loading = ref(true);
@@ -133,7 +135,7 @@ async function remove() {
       <div class="row g-4 mt-1">
         <!-- left: photo, notes, history -->
         <div class="col-12 col-lg-7">
-          <img v-if="fridge.photoUrl" class="w-100 rounded-4 border" style="aspect-ratio: 3 / 2; object-fit: cover" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" />
+          <div v-if="fridge.photoUrl" class="fridge-media"><img v-parallax="8" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" /></div>
           <div v-else class="photo-placeholder rounded-4" aria-hidden="true">🧊</div>
           <div v-if="fridge.description" class="mt-3">
             <h2 class="h6">About this fridge</h2>
@@ -144,8 +146,8 @@ async function remove() {
             <h2 id="history-title" class="h5">Status history</h2>
             <div v-if="updatesError" class="alert alert-danger py-2" role="alert">{{ updatesError }} <button class="btn btn-sm btn-outline-danger ms-2" @click="loadUpdates(true)">Retry</button></div>
             <p v-else-if="!updates.length && !loadingMore" class="text-body-secondary" data-testid="no-updates">Nobody has posted an update yet. Be the first!</p>
-            <ul class="update-list" data-testid="update-list">
-              <li v-for="u in updates" :key="u.id" class="update-item" data-testid="update-item">
+            <ul class="update-list timeline" data-testid="update-list">
+              <li v-for="(u, i) in updates" :key="u.id" v-reveal="i" class="update-item" :class="`status-${u.status}`" data-testid="update-item">
                 <div class="d-flex flex-wrap align-items-center gap-2">
                   <FridgeStatusBadge :status="u.status" />
                   <span class="small text-body-secondary" :title="formatDateTime(u.createdAt)">
@@ -167,11 +169,11 @@ async function remove() {
 
         <!-- right: current status, details, actions -->
         <div class="col-12 col-lg-5">
-          <div class="bg-white border rounded-4 p-4">
+          <div v-reveal class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${fridge.latestStatus || 'unknown'}`">
             <div class="text-body-secondary small">Community fridge</div>
             <h1 class="h3 mb-3" data-testid="fridge-title">{{ fridge.name }}</h1>
 
-            <FridgeStatusBadge :status="fridge.latestStatus" large />
+            <FridgeStatusBadge :key="fridge.latestStatus" :status="fridge.latestStatus" large />
             <div class="small mt-2" data-testid="last-updated" :title="fridge.latestUpdateAt ? formatDateTime(fridge.latestUpdateAt) : ''">
               <template v-if="fridge.latestUpdateAt"><i class="bi bi-clock me-1" aria-hidden="true"></i>Last updated {{ timeAgo(fridge.latestUpdateAt, now) }}</template>
               <template v-else>Nobody has posted an update yet.</template>
@@ -194,7 +196,7 @@ async function remove() {
             </div>
           </div>
 
-          <div class="bg-white border rounded-4 p-4 mt-4">
+          <div v-reveal class="bg-white border rounded-4 p-4 mt-4 fridge-panel">
             <h2 class="h5">Post a status update</h2>
             <FridgeStatusForm v-if="session.isLoggedIn" :fridge-id="fridge.id" @posted="onPosted" />
             <p v-else class="mb-0">
@@ -210,7 +212,7 @@ async function remove() {
 
         <div class="col-12">
           <h2 class="h6">Location</h2>
-          <div style="height: 320px"><FridgeMap :fridges="mapFridges" :linkable="false" /></div>
+          <div v-reveal class="fridge-map-wrap" style="height: 320px"><FridgeMap :fridges="mapFridges" :linkable="false" /></div>
         </div>
       </div>
 

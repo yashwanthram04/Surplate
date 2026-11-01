@@ -6,6 +6,7 @@ import AddressSearch from '../components/AddressSearch.vue';
 import FridgeMap from '../components/FridgeMap.vue';
 import { MAX_PHOTO_BYTES } from '../constants';
 import { useFormErrors } from '../composables/useFormErrors';
+import { useSmoothScroll, vReveal } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 
 // One form for both "Add a fridge" (no id) and "Edit" (id from the route).
@@ -13,6 +14,7 @@ import { useSession } from '../stores/session';
 const props = defineProps({ id: { type: String, default: '' } });
 const router = useRouter();
 const session = useSession();
+useSmoothScroll();
 const editing = computed(() => !!props.id);
 
 const form = reactive({ name: '', description: '', openingHours: '', address: '', postal: '', lat: null, lng: null });
@@ -44,7 +46,6 @@ async function loadExisting() {
 }
 if (editing.value) loadExisting();
 
-// ---- validation (mirrors server/src/utils/validateFridge.js; the server stays the authority) ---
 const clientErrors = computed(() => {
   const e = {};
   const name = form.name.trim();
@@ -142,7 +143,7 @@ function focusFirstError() {
       <div v-if="formError" class="col-12"><div class="alert alert-danger mb-0" role="alert" data-testid="form-error">{{ formError }}</div></div>
 
       <div class="col-12 col-lg-7">
-        <div class="bg-white border rounded-4 p-3 p-md-4">
+        <div v-reveal class="bg-white border rounded-4 p-3 p-md-4 fridge-form-card">
           <div class="mb-3">
             <label for="name" class="form-label fw-semibold">Name</label>
             <input id="name" v-model="form.name" class="form-control" :class="cls('name')" maxlength="80" placeholder="e.g. Tiong Bahru Community Fridge" :aria-invalid="!!err('name')" aria-describedby="name-err" />
@@ -168,7 +169,7 @@ function focusFirstError() {
       </div>
 
       <div class="col-12 col-lg-5">
-        <div class="bg-white border rounded-4 p-3 p-md-4 mb-4">
+        <div v-reveal class="bg-white border rounded-4 p-3 p-md-4 fridge-form-card mb-4">
           <label for="address" class="form-label fw-semibold">Address</label>
           <AddressSearch id="address" v-model="form.address" placeholder="Search an address or postal code" :invalid="!!err('address')" @select="onAddress" />
           <div v-if="err('address')" class="text-danger small mt-1" role="alert" data-testid="address-error">{{ err('address') }}</div>
@@ -176,7 +177,7 @@ function focusFirstError() {
           <div v-if="previewFridges.length" class="mt-3" style="height: 220px"><FridgeMap :fridges="previewFridges" :linkable="false" /></div>
         </div>
 
-        <div class="bg-white border rounded-4 p-3 p-md-4">
+        <div v-reveal class="bg-white border rounded-4 p-3 p-md-4 fridge-form-card">
           <label for="photo" class="form-label fw-semibold">Photo <span class="text-body-secondary fw-normal">(optional)</span></label>
           <img v-if="photoPreview" :src="photoPreview" class="photo-preview d-block mb-2" alt="Preview of the chosen photo" />
           <img v-else-if="existingPhoto" :src="existingPhoto" class="photo-preview d-block mb-2" alt="Current photo" />

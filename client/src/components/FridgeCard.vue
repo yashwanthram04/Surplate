@@ -1,20 +1,23 @@
 <script setup>
+import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 import { now } from '../composables/useNow';
 import { isStale, timeAgo } from '../utils/fridge';
 import FridgeStatusBadge from './FridgeStatusBadge.vue';
 
-defineProps({
+const props = defineProps({
   fridge: { type: Object, required: true },
   highlighted: Boolean,
 });
+// true when the last update is under an hour old (shows a small pulsing green dot)
+const isLive = computed(() => !!props.fridge.latestUpdateAt && now.value - new Date(props.fridge.latestUpdateAt).getTime() < 60 * 60 * 1000);
 defineEmits(['hover']);
 </script>
 
 <template>
   <article
-    class="listing-card h-100 d-flex flex-column position-relative"
-    :class="{ 'is-highlighted': highlighted }"
+    class="listing-card fridge-card h-100 d-flex flex-column position-relative"
+    :class="[`status-${fridge.latestStatus || 'unknown'}`, { 'is-highlighted': highlighted }]"
     data-testid="fridge-card"
     @mouseenter="$emit('hover', fridge.id)"
     @mouseleave="$emit('hover', null)"
@@ -40,7 +43,7 @@ defineEmits(['hover']);
 
       <div class="mt-auto small">
         <div data-testid="last-updated">
-          <i class="bi bi-clock me-1" aria-hidden="true"></i>
+          <span v-if="isLive" class="live-dot" aria-hidden="true"></span><i v-else class="bi bi-clock me-1" aria-hidden="true"></i><!-- pulsing dot when fresh -->
           <template v-if="fridge.latestUpdateAt">
             Updated {{ timeAgo(fridge.latestUpdateAt, now) }}<span v-if="isStale(fridge.latestUpdateAt, now)" class="text-body-secondary"> · may be out of date</span>
           </template>
