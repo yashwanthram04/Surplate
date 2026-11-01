@@ -1,14 +1,15 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import FridgeBackdrop from '../components/FridgeBackdrop.vue';
+import FridgeBanner from '../components/FridgeBanner.vue';
+import FridgeMascot from '../components/FridgeMascot.vue';
 import { api, errorMessage } from '../api';
 import { now } from '../composables/useNow';
 import { useSmoothScroll, vReveal } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 import { timeAgo } from '../utils/fridge';
 
-// Spoiled-food reports. Bakeries see the reports sent to them (they dropped the food off);
-// admins see every report, including ones no supplier could be matched to.
 const session = useSession();
 useSmoothScroll();
 const tab = ref('open');
@@ -16,7 +17,7 @@ const items = ref([]);
 const loading = ref(true);
 const error = ref('');
 
-const resolvingId = ref(null); // which report has its "resolve" box open
+const resolvingId = ref(null);
 const resolution = ref('');
 const busyId = ref(null);
 const actionError = ref('');
@@ -66,11 +67,13 @@ async function resolve(report) {
 
 <template>
   <div class="mx-auto" style="max-width: 900px">
-    <h1 class="h3 mb-1">Spoiled food alerts</h1>
-    <p class="text-body-secondary">
-      <template v-if="session.isAdmin">Every spoiled-food report from community fridges.</template>
-      <template v-else>People flagged food you dropped off at a community fridge. Please collect it if you can, then mark the alert resolved.</template>
-    </p>
+    <FridgeBackdrop />
+    <FridgeBanner class="mb-4" title="Spoiled food alerts" :mood="tab === 'open' && items.length ? 'low' : 'stocked'" mini :foods="['🧽', '🧤', '🗑️', '💚']">
+      <p class="mb-0">
+        <template v-if="session.isAdmin">Every spoiled-food report from community fridges.</template>
+        <template v-else>People flagged food you dropped off at a community fridge. Please collect it if you can, then mark the alert resolved.</template>
+      </p>
+    </FridgeBanner>
 
     <ul class="nav nav-pills mb-3" role="tablist">
       <li class="nav-item"><button type="button" class="nav-link" :class="{ active: tab === 'open' }" role="tab" :aria-selected="tab === 'open'" data-testid="tab-open" @click="tab = 'open'">Open</button></li>
@@ -82,7 +85,7 @@ async function resolve(report) {
     </div>
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
     <div v-else-if="!items.length && !error" class="text-center py-5 bg-white border rounded-4" data-testid="empty-state">
-      <div class="display-5 mb-2">✅</div>
+      <FridgeMascot mood="stocked" :size="110" />
       <h2 class="h5">{{ tab === 'open' ? 'No open alerts' : 'Nothing resolved yet' }}</h2>
     </div>
 

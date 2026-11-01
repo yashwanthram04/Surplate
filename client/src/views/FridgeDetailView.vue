@@ -1,14 +1,16 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage } from '../api';
 import ConfirmModal from '../components/ConfirmModal.vue';
+import FridgeBackdrop from '../components/FridgeBackdrop.vue';
 import FridgeMap from '../components/FridgeMap.vue';
+import FridgeMascot from '../components/FridgeMascot.vue';
 import FridgeStatusBadge from '../components/FridgeStatusBadge.vue';
 import FridgeStatusForm from '../components/FridgeStatusForm.vue';
 import SpoiledFlagModal from '../components/SpoiledFlagModal.vue';
 import { now } from '../composables/useNow';
-import { useSmoothScroll, vParallax, vReveal } from '../composables/useFridgeMotion';
+import { burst, hop, useSmoothScroll, vParallax, vReveal } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
 import { isStale, timeAgo } from '../utils/fridge';
 import { formatDateTime } from '../utils/time';
@@ -23,6 +25,11 @@ const fridge = ref(null);
 const loading = ref(true);
 const notFound = ref(false);
 const error = ref('');
+
+const statusPanel = ref(null);
+const statusMascot = ref(null);
+const CONFETTI = { stocked: ['🥖', '🥗', '🍎', '🎉', '💚', '✨'], low: ['🍞', '💛', '✨'], empty: ['💧', '😢'] };
+const confetti = (status) => burst(statusPanel.value?.querySelector('[data-testid="fridge-status"]') ?? statusPanel.value, CONFETTI[status] ?? CONFETTI.stocked);
 const flash = ref(route.query.added ? 'Thanks! The fridge is on the map. Post a status update so people know what is inside.' : route.query.updated ? 'Your changes have been saved.' : '');
 
 const updates = ref([]);
@@ -50,6 +57,7 @@ async function load() {
     fridge.value = data;
     document.title = `${data.name} – Surplate`;
     await loadUpdates(true);
+    if (route.query.added) setTimeout(() => confetti('stocked'), 900);
   } catch (err) {
     if (err.response?.status === 404) notFound.value = true;
     else error.value = errorMessage(err);
@@ -79,6 +87,10 @@ function onPosted(update) {
   updates.value = [update, ...updates.value];
   fridge.value = { ...fridge.value, latestStatus: update.status, latestUpdateAt: update.createdAt, latestNote: update.note };
   flash.value = 'Thanks! The status has been updated.';
+  nextTick(() => {
+    confetti(update.status);
+    hop(statusMascot.value?.$el);
+  });
 }
 
 function openFlag(update = null) {
@@ -108,6 +120,7 @@ async function remove() {
 
 <template>
   <div class="mx-auto" style="max-width: 1100px">
+    <FridgeBackdrop />
     <RouterLink :to="{ name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All community fridges</RouterLink>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
@@ -133,7 +146,6 @@ async function remove() {
       </div>
 
       <div class="row g-4 mt-1">
-        <!-- left: photo, notes, history -->
         <div class="col-12 col-lg-7">
           <div v-if="fridge.photoUrl" class="fridge-media"><img v-parallax="8" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" /></div>
           <div v-else class="photo-placeholder rounded-4" aria-hidden="true">🧊</div>
@@ -169,9 +181,10 @@ async function remove() {
 
         <!-- right: current status, details, actions -->
         <div class="col-12 col-lg-5">
-          <div v-reveal class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${fridge.latestStatus || 'unknown'}`">
+          <div ref="statusPanel" v-reveal class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${fridge.latestStatus || 'unknown'}`">
+            <FridgeMascot ref="statusMascot" class="status-mascot" :mood="fridge.latestStatus || 'unknown'" :size="92" />
             <div class="text-body-secondary small">Community fridge</div>
-            <h1 class="h3 mb-3" data-testid="fridge-title">{{ fridge.name }}</h1>
+            <h1 class="h3 mb-3 fridge-title" data-testid="fridge-title">{{ fridge.name }}</h1>
 
             <FridgeStatusBadge :key="fridge.latestStatus" :status="fridge.latestStatus" large />
             <div class="small mt-2" data-testid="last-updated" :title="fridge.latestUpdateAt ? formatDateTime(fridge.latestUpdateAt) : ''">

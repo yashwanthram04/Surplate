@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
+import FridgeBackdrop from '../components/FridgeBackdrop.vue';
+import FridgeBanner from '../components/FridgeBanner.vue';
 import FridgeMap from '../components/FridgeMap.vue';
 import { MAX_PHOTO_BYTES } from '../constants';
 import { useFormErrors } from '../composables/useFormErrors';
@@ -130,10 +132,12 @@ function focusFirstError() {
 </script>
 
 <template>
-  <div class="mx-auto" style="max-width: 1100px">
+  <div class="mx-auto fridge-form-page" style="max-width: 1100px">
+    <FridgeBackdrop />
     <RouterLink :to="editing ? { name: 'fridge', params: { id } } : { name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</RouterLink>
-    <h1 class="h3 mt-2">{{ editing ? 'Edit fridge' : 'Add a fridge' }}</h1>
-    <p v-if="!editing" class="text-body-secondary">Know a community fridge where anyone can take or leave food? Add it so others can find it.</p>
+    <FridgeBanner class="mt-2 mb-4" :title="editing ? 'Edit fridge' : 'Add a fridge'" mood="stocked" mini :foods="['🥕', '🥐', '🍎', '🥛']">
+      <p class="mb-0">{{ editing ? 'Keep the details up to date so people can find it.' : 'Know a community fridge where anyone can take or leave food? Add it so others can find it.' }}</p>
+    </FridgeBanner>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
     <div v-else-if="loadError" class="alert alert-warning" role="alert">{{ loadError }} <RouterLink :to="{ name: 'fridges' }" class="alert-link">Back to the map</RouterLink></div>

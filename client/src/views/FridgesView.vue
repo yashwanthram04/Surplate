@@ -3,9 +3,12 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
+import FridgeBackdrop from '../components/FridgeBackdrop.vue';
+import FridgeBanner from '../components/FridgeBanner.vue';
 import FridgeCard from '../components/FridgeCard.vue';
+import FridgeMascot from '../components/FridgeMascot.vue';
 import FridgeMap from '../components/FridgeMap.vue';
-import { useHeroIntro, useCountUp, useSmoothScroll, vReveal } from '../composables/useFridgeMotion';
+import { useCountUp, useMarquee, useScrollSkew, useSmoothScroll, vMagnetic, vReveal } from '../composables/useFridgeMotion'; // ✨ NEW
 import { useSession } from '../stores/session';
 import { FRIDGE_STATUSES, statusMeta } from '../utils/fridge';
 
@@ -96,36 +99,56 @@ function clearAll() {
 }
 
 useSmoothScroll();
-const heroEl = ref(null);
-useHeroIntro(heroEl);
 const shownTotal = useCountUp(() => items.value.length);
 const shownStocked = useCountUp(() => items.value.filter((f) => f.latestStatus === 'stocked').length);
 const shownNeedy = useCountUp(() => items.value.filter((f) => f.latestStatus === 'low' || f.latestStatus === 'empty').length);
+// two crossing tapes under the banner, running opposite ways
+const ribbonFront = ref(null);
+const ribbonBack = ref(null);
+const frontItems = ['🥖 Take what you need', '🥗 Leave what you can', '🍎 Free food, any time', '🥐 No reservation needed', '💚 Check the date, trust your nose'];
+const backItems = ['Free food', 'Take one', 'Leave one', 'Share more', 'Waste less'];
+const frontLoop = [...frontItems, ...frontItems, ...frontItems];
+const backLoop = [...backItems, ...backItems, ...backItems, ...backItems];
+useMarquee(ribbonFront, { speed: 1.3 });
+useMarquee(ribbonBack, { speed: 1, reverse: true });
+const cardGrid = ref(null);
+useScrollSkew(cardGrid);
+// the mascot is happy when most fridges are stocked, worried when more need a refill
+const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.filter((f) => f.latestStatus === 'stocked').length >= items.value.filter((f) => f.latestStatus === 'low' || f.latestStatus === 'empty').length ? 'stocked' : 'low'));
 </script>
 
 <template>
   <div class="row g-4">
-    <div ref="heroEl" class="col-12">
-      <section class="fridge-hero" aria-label="About community fridges">
-        <span class="hero-float f1" aria-hidden="true">🥖</span>
-        <span class="hero-float f2" aria-hidden="true">🥗</span>
-        <span class="hero-float f3" aria-hidden="true">🍎</span>
-        <div class="position-relative">
-          <h1 class="h2 mb-2 hero-fx-title">Community fridges</h1>
-          <p class="mb-3 hero-fx-sub">Free food, any time of day. Take what you need, leave what you can. No listing or reservation needed.</p>
-          <RouterLink :to="{ name: 'fridge-new' }" class="btn btn-light hero-fx-action" data-testid="add-fridge">
-            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add a fridge
+    <FridgeBackdrop />
+    <div class="col-12">
+      <FridgeBanner title="Community fridges" :mood="heroMood">
+        <p class="mb-3">Free food, any time of day. Take what you need, leave what you can. No listing or reservation needed.</p>
+        <div class="d-inline-block">
+          <RouterLink v-magnetic :to="{ name: 'fridge-new' }" class="btn btn-sticker" data-testid="add-fridge">
+            <i class="bi bi-plus-lg me-2" aria-hidden="true"></i>Add a fridge
           </RouterLink>
-          <div class="hero-stats">
-            <div class="hero-stat"><strong>{{ shownTotal }}</strong><span>Fridges shown</span></div>
-            <div class="hero-stat"><strong>{{ shownStocked }}</strong><span>Ready to take from</span></div>
-            <div class="hero-stat"><strong>{{ shownNeedy }}</strong><span>Need a refill</span></div>
-          </div>
         </div>
-      </section>
+        <div class="hero-stats">
+          <div class="hero-stat"><strong>{{ shownTotal }}</strong><span>Fridges shown</span></div>
+          <div class="hero-stat"><strong>{{ shownStocked }}</strong><span>Ready to take from</span></div>
+          <div class="hero-stat"><strong>{{ shownNeedy }}</strong><span>Need a refill</span></div>
+        </div>
+      </FridgeBanner>
     </div>
 
-    <!-- List / map toggle for small screens -->
+    <div class="col-12 fridge-ribbons" aria-hidden="true">
+      <div class="fridge-ribbon rb-back">
+        <div ref="ribbonBack" class="rb-track">
+          <div v-for="n in 2" :key="n" class="rb-half"><span v-for="(t, i) in backLoop" :key="i" class="rb-item">{{ t }}</span></div>
+        </div>
+      </div>
+      <div class="fridge-ribbon rb-front">
+        <div ref="ribbonFront" class="rb-track">
+          <div v-for="n in 2" :key="n" class="rb-half"><span v-for="(t, i) in frontLoop" :key="i" class="rb-item">{{ t }}</span></div>
+        </div>
+      </div>
+    </div>
+
     <div class="col-12 d-lg-none">
       <div class="btn-group w-100" role="group" aria-label="Show list or map">
         <button type="button" class="btn" :class="view === 'list' ? 'btn-primary' : 'btn-outline-primary'" :aria-pressed="view === 'list'" @click="view = 'list'"><i class="bi bi-list-ul me-1" aria-hidden="true"></i>List</button>
@@ -134,7 +157,7 @@ const shownNeedy = useCountUp(() => items.value.filter((f) => f.latestStatus ===
     </div>
 
     <div class="col-12 col-lg-7 col-xxl-8 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'map' }">
-      <section class="bg-white border rounded-4 p-3 mb-3 fridge-filters" aria-label="Filters">
+      <section v-reveal class="bg-white border rounded-4 p-3 mb-3 fridge-filters" aria-label="Filters">
         <div class="row g-2 align-items-end">
           <div class="col-12 col-md-8">
             <label for="fr-q" class="form-label small fw-semibold mb-1">Search</label>
@@ -202,13 +225,13 @@ const shownNeedy = useCountUp(() => items.value.filter((f) => f.latestStatus ===
       </div>
 
       <div v-else-if="!items.length && !error" class="text-center py-5 bg-white border rounded-4" data-testid="empty-state">
-        <div class="display-5 mb-2">🧊</div>
+        <FridgeMascot mood="empty" :size="120" />
         <h2 class="h5">No fridges match</h2>
         <p class="text-body-secondary mb-3">Try widening your filters. Know a fridge that isn't here?</p>
         <RouterLink :to="{ name: 'fridge-new' }" class="btn btn-primary">Add it to the map</RouterLink>
       </div>
 
-      <div v-else class="row g-3">
+      <div v-else ref="cardGrid" class="row g-3">
         <div v-for="(f, i) in items" :key="f.id" v-reveal="i" class="col-12 col-md-6 col-xxl-4">
           <FridgeCard :fridge="f" :highlighted="hoverId === f.id" @hover="hoverId = $event" />
         </div>

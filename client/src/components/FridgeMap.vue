@@ -21,7 +21,8 @@ let map = null;
 let pinLayer = null;
 let centerLayer = null;
 let lastFitKey = '';
-const pins = new Map(); // fridge id -> marker, for highlighting
+let resizeObserver = null;
+const pins = new Map();
 
 const ONEMAP_ATTRIBUTION =
   '<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a> &copy; contributors | ' +
@@ -30,11 +31,11 @@ const ONEMAP_ATTRIBUTION =
 function popupFor(f) {
   const box = document.createElement('div');
   const title = document.createElement('strong');
-  title.textContent = f.name; // textContent: names are user-supplied
+  title.textContent = f.name;
   box.append(title);
 
   const status = document.createElement('div');
-  status.className = `fridge-popup-badge mt-1 status-${f.latestStatus ?? 'unknown'}`; // coloured by status
+  status.className = `fridge-popup-badge mt-1 status-${f.latestStatus ?? 'unknown'}`;
   status.textContent = statusMeta(f.latestStatus).label;
   box.append(status);
 
@@ -60,7 +61,6 @@ function popupFor(f) {
 function drawFridges() {
   pinLayer.clearLayers();
   pins.clear();
-  // pins "drop in" only when the set of fridges changed, not on the 60 s refresh
   const fresh = props.fridges.map((f) => f.id).sort().join(',') !== lastFitKey.split('|')[0];
   let order = 0;
   for (const f of props.fridges) {
@@ -73,7 +73,7 @@ function drawFridges() {
       popupAnchor: [0, -32],
     });
     const marker = L.marker([f.lat, f.lng], { icon, title: `${f.name}: ${statusMeta(status).label}`, keyboard: true });
-    marker.bindPopup(() => popupFor(f), { className: 'fridge-popup' }); //className = rounded popup style
+    marker.bindPopup(() => popupFor(f), { className: 'fridge-popup' });
     marker.addTo(pinLayer);
     pins.set(f.id, marker);
   }
@@ -82,7 +82,6 @@ function drawFridges() {
 }
 
 function fitIfNeeded() {
-  // Re-fit only when the set of fridges changes, so the 60 s refresh doesn't undo the user's panning.
   const key = props.fridges.map((f) => f.id).sort().join(',') + (props.center ? `|${props.center.lat},${props.center.lng}` : '');
   if (key === lastFitKey) return;
   lastFitKey = key;
@@ -116,8 +115,13 @@ onMounted(() => {
   centerLayer = L.layerGroup().addTo(map);
   drawCenter();
   drawFridges();
+  resizeObserver = new ResizeObserver(() => map?.invalidateSize());
+  resizeObserver.observe(el.value);
 });
-onBeforeUnmount(() => map?.remove());
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  map?.remove();
+});
 
 watch(() => props.fridges, () => map && drawFridges());
 watch(() => [props.center, props.radiusKm], () => {
