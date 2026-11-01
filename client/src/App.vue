@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { MotionConfig } from 'motion-v';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import { api } from './api';
 import { ROLE_LABELS } from './constants';
@@ -186,12 +185,14 @@ async function logout() {
     </div>
   </nav>
 
-  <!-- reducedMotion="user": every animation on the site honours the visitor's "reduce motion" setting -->
-  <MotionConfig reduced-motion="user">
-    <SlotReminders v-if="session.ready" />
-    <ReviewPrompt v-if="session.ready" />
-    <main id="main" :class="route.meta.fullWidth ? '' : 'container-fluid px-3 px-lg-4 py-4'">
-      <RouterView />
-    </main>
-  </MotionConfig>
+  <SlotReminders v-if="session.ready" />
+  <ReviewPrompt v-if="session.ready" />
+  <main id="main" :class="route.meta.fullWidth ? '' : 'container-fluid px-3 px-lg-4 py-4'">
+    <!-- soft cross-fade between pages (opacity + blur only: a transform here would skew ScrollTrigger's pin measurements) -->
+    <RouterView v-slot="{ Component }">
+      <Transition name="page" mode="out-in">
+        <component :is="Component" />
+      </Transition>
+    </RouterView>
+  </main>
 </template>

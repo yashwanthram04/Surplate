@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { now } from '../composables/useNow';
 import { formatRemaining } from '../utils/time';
 
@@ -10,6 +10,16 @@ const props = defineProps({
   end: { type: [String, Number, Date], required: true },
   size: { type: Number, default: 58 },
 });
+
+// The ring draws itself in once when it appears (the arc starts empty and eases round), then follows the clock.
+const drawn = ref(false);
+const drawing = ref(true);
+let settle = 0;
+onMounted(() => {
+  requestAnimationFrame(() => (drawn.value = true));
+  settle = setTimeout(() => (drawing.value = false), 1300);
+});
+onBeforeUnmount(() => clearTimeout(settle));
 
 const R = 18;
 const C = 2 * Math.PI * R;
@@ -42,6 +52,7 @@ const label = computed(() => `${centerText.value} ${caption.value}`);
 <template>
   <svg
     class="countdown-ring"
+    :class="{ 'ring-urgent': phase === 'open' && remaining <= 10 * 60 * 1000, 'is-drawing': drawing }"
     :width="size"
     :height="size"
     viewBox="0 0 44 44"
@@ -52,6 +63,7 @@ const label = computed(() => `${centerText.value} ${caption.value}`);
     <title>{{ label }}</title>
     <circle cx="22" cy="22" :r="R" fill="none" stroke="#e5e7eb" stroke-width="4" />
     <circle
+      class="arc"
       cx="22"
       cy="22"
       :r="R"
@@ -60,9 +72,8 @@ const label = computed(() => `${centerText.value} ${caption.value}`);
       stroke-width="4"
       stroke-linecap="round"
       :stroke-dasharray="phase === 'upcoming' ? '3 4' : C"
-      :stroke-dashoffset="phase === 'upcoming' ? 0 : C * (1 - fraction)"
+      :stroke-dashoffset="phase === 'upcoming' ? 0 : C * (1 - (drawn ? fraction : 0))"
       transform="rotate(-90 22 22)"
-      style="transition: stroke-dashoffset 1s linear"
     />
     <text x="22" y="25" text-anchor="middle" :font-size="centerText.length > 4 ? 8 : 9.5" font-weight="600" :fill="color">{{ centerText }}</text>
   </svg>

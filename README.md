@@ -3,14 +3,21 @@
 Bakeries post leftover food; charities and individuals find it on a map and collect it before the pickup window closes.
 IS216 group project, Group 5 (section G7).
 
-**Stack:** Vue 3 (Vite, vue-router, Pinia) · Bootstrap 5 · motion-v (animation) · Express · MongoDB (Mongoose) · OneMap API + Leaflet
+**Stack:** Vue 3 (Vite, vue-router, Pinia) · Bootstrap 5 · GSAP (ScrollTrigger, SplitText) + Lenis (animation) · Express · MongoDB (Mongoose) · OneMap API + Leaflet
 
 ## What is built so far
 
 ### Home page
-Animated landing page that explains the app: hero, live numbers from the API, how it works, the problem (with a cited NEA statistic),
-the newest listings, and a sign-up path for each kind of user. All motion respects the visitor's "reduce motion" setting.
-`client/src/views/HomeView.vue`
+Scroll-driven landing page that explains the app, built from a few purposeful scenes and nothing decorative: a split-text hero with gentle mouse parallax,
+a **mission statement whose words light up as you scroll**, live numbers from the API, a **pinned "how it works" scene** that plays post, find and collect as you scroll,
+a dark circle that grows from a single dot to swallow the page while the 790,000-tonne figure (NEA, cited) counts with your scroll, the newest listings, and
+sideways-scrolling audience cards. The rest of the app gets route cross-fades, staggered listing cards that glide into place when you filter, and countdown rings that pulse in their last ten minutes.
+
+- Built with **GSAP + ScrollTrigger + SplitText** (all in the free GSAP package) and **Lenis** smooth scrolling. All of it lives in `client/src/composables/useHomeMotion.js`; the markup in `HomeView.vue` only carries `data-*` hooks.
+- **Accessible by default:** with "reduce motion" on, or on phones, the page is the plain stacked layout (no pinning, no smooth-scroll hijacking, no looping decoration), and the animated headline keeps its real text for screen readers.
+- Pinned scenes only run on wide screens; ScrollTriggers must be created top-to-bottom in page order (see the comment in `useHomeMotion.js`).
+- **Everyday pages** (browse board, My listings, listing page) use a quieter set in `client/src/composables/useMotion.js`: new cards rise in one after another, a removed card shrinks away while the rest close the gap, cards that stay **glide** to their new places when a filter or sort changes the list (GSAP Flip), the listing photo eases in, and countdown rings draw themselves in. Transform and opacity only, and none of it runs for visitors who prefer reduced motion.
+`client/src/views/HomeView.vue`, `client/src/home.css`
 
 ### Accounts
 | | Bakery / restaurant | Charity | Individual |
@@ -108,13 +115,23 @@ the listing opens, with reservation code **`HKT4X2`**. Log in as Sunrise Bakery 
 ## Tests
 
 ```bash
+npm run test:unit        # Vitest: unit, component and integration tests for the client (jsdom, no browser, ~2 s)
 npm run test:api         # API tests (node:test): accounts, verification, visibility, validation, ownership, expiry, filters
 npm run test:e2e         # Playwright E2E in Chromium (first time: npx playwright install chromium)
-npm test                 # both
+npm test                 # all three
 ```
 
-Both suites start their **own** in-memory database with fresh demo data, so they never touch shared data (even if `server/.env`
-points at Atlas) and are repeatable. E2E tests also fail on any uncaught error in the page. The OneMap lookup is mocked in the
+| Level | Tool | Where | What it covers |
+|---|---|---|---|
+| Unit (functions) | Vitest | `client/src/utils/__tests__/time.spec.js` | Countdown and pickup-window formatting, datetime-local conversion |
+| Unit (functions) | node:test | `server/test/listing-rules.test.js` | Listing validation, photo checks (by magic bytes) and who may see a listing, with no database |
+| Component | Vitest + Vue Test Utils | `client/src/components/__tests__/` (`CountdownRing`, `ListingCard`, `ListingFilters`), `components/home/__tests__/CountUp.spec.js`, `composables/__tests__/useMotion.spec.js` | One component in isolation: what it shows for each prop, what it emits, reduced motion and clean-up |
+| Integration | Vitest + Vue Test Utils | `components/__tests__/ListingCardIntegration.spec.js`, `views/__tests__/BrowseView.spec.js` | Card + ring on one shared clock; the browse page with the real card and filters and a mocked API (debounce, stale responses, errors, 15 s refresh, closing windows) |
+| API | node:test | `server/test/*.test.js` | Every route end to end against an in-memory MongoDB |
+| End to end | Playwright | `e2e/*.spec.js` | Full user journeys in a real browser |
+
+Every suite starts its **own** in-memory database or mocks the API, so none touches shared data (even if `server/.env`
+points at Atlas) and all are repeatable. E2E tests also fail on any uncaught error in the page. The OneMap lookup is mocked in the
 browser tests and exercised for real by hand. Reports: `playwright-report/`.
 
 ## Production build

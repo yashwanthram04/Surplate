@@ -296,3 +296,63 @@ body {
 .nav-pills {
   --bs-nav-pills-link-active-bg: var(--sp-green);
 }
+
+/* ---------- route transitions ---------- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.22s ease, filter 0.22s ease;
+}
+.page-enter-from,
+.page-leave-to {
+  opacity: 0;
+  filter: blur(5px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
+}
+
+/* ---------- listing cards: entrance, leave and glide are driven by GSAP (composables/useMotion.js) ---------- */
+.photo-frame {
+  overflow: hidden; /* the detail photo eases in from a slight zoom; this keeps it inside its rounded frame */
+}
+.listing-card .photo {
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.listing-card:hover .photo,
+.listing-card.is-highlighted .photo {
+  transform: scale(1.05);
+}
+
+/* countdown ring: the arc follows the clock, and eases round the first time it appears */
+.countdown-ring .arc {
+  transition: stroke-dashoffset 1s linear;
+}
+.countdown-ring.is-drawing .arc {
+  transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* a ring in its last ten minutes gently pulses */
+.countdown-ring.ring-urgent {
+  animation: ring-urgent 1.4s ease-in-out infinite;
+}
+@keyframes ring-urgent {
+  50% {
+    transform: scale(1.1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .countdown-ring.ring-urgent {
+    animation: none;
+  }
+  .countdown-ring .arc,
+  .listing-card .photo {
+    transition: none;
+  }
+  .listing-card:hover .photo,
+  .listing-card.is-highlighted .photo {
+    transform: none;
+  }
+}

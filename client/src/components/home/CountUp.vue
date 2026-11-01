@@ -1,5 +1,4 @@
 <script setup>
-import { useReducedMotion } from 'motion-v';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 // A number that counts up to its value once it is on screen (and again, smoothly, if the value changes).
@@ -10,7 +9,7 @@ const props = defineProps({
 
 const el = ref(null);
 const shown = ref(0);
-const reduceMotion = useReducedMotion();
+const reduceMotion = { get value() { return matchMedia('(prefers-reduced-motion: reduce)').matches; } };
 let visible = false;
 let frame = 0;
 let observer = null;
