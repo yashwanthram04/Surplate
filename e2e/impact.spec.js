@@ -16,6 +16,9 @@ test('dashboard shows personal, bakery, charity and platform impact and filters 
   await expect(page.getByRole('heading', { name: 'Impact by bakery' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Food collected by charities' })).toBeVisible();
   await expect(page.getByTestId('collectedKg').first()).not.toHaveText('0');
+  await page.locator('.impact-note').scrollIntoViewIfNeeded();
+  await expect.poll(() => page.locator('.impact-card').evaluateAll((cards) => cards.every((card) => Number(getComputedStyle(card).opacity) === 1))).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath('impact-desktop.png'), fullPage: true });
   await page.getByLabel('From', { exact: true }).fill('2099-01-01');
   await page.getByRole('button', { name: 'Apply dates' }).click();
@@ -25,6 +28,9 @@ test('dashboard shows personal, bakery, charity and platform impact and filters 
   await expect(page.getByTestId('collectedKg').first()).not.toHaveText('0');
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('.impact-note').scrollIntoViewIfNeeded();
+  await expect.poll(() => page.locator('.impact-card').evaluateAll((cards) => cards.every((card) => Number(getComputedStyle(card).opacity) === 1))).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath('impact-mobile.png'), fullPage: true });
 });
 
@@ -104,4 +110,79 @@ test('dashboard handles an API failure and can retry', async ({ page }) => {
 test('dashboard requires login', async ({ page }) => {
   await page.goto('/impact');
   await expect(page).toHaveURL(/\/login\?next=/);
+});
+
+test('charts react to scope, metrics, date presets and refreshed API responses', async ({ page }) => {
+  await page.clock.install();
+  await login(page, 'alex');
+  await page.goto('/impact');
+  await expect(page.getByRole('heading', { name: 'Impact over time' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Who we reach' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Community pulse' })).toBeVisible();
+  await page.getByRole('button', { name: 'Your impact', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Your impact', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel('Trend metric').selectOption('collections');
+  await expect(page.locator('.chart-total').first()).toHaveText(String((await (await page.request.get('/api/impact')).json()).mine.collections));
+  await page.getByRole('button', { name: 'Last 30 days', exact: true }).click();
+  await expect(page.getByText('Daily totals', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'All time', exact: true }).click();
+  await expect(page.getByText('Monthly totals', { exact: false })).toBeVisible();
+  let refreshes = 0;
+  await page.route('**/api/impact', async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    json.mine.collections += 3 * ++refreshes;
+    await route.fulfill({ response, json });
+  });
+  const before = (await (await page.request.get('/api/impact')).json()).mine.collections;
+  await page.getByRole('button', { name: 'Refresh impact', exact: true }).click();
+  await expect(page.getByTestId('collections').first()).toHaveText(String(before + 3));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.getByTestId('collections').first()).toHaveText(String(before + 3));
+  await page.clock.fastForward(60000);
+  await expect(page.getByTestId('collections').first()).toHaveText(String(before + 6));
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('charts wait for scrolling, reveal once, and stay visible with reduced motion', async ({ page }) => {
+  await login(page, 'alex');
+  await page.route('**/api/impact', async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    json.trend.platform = [
+      { date: '2026-01', collectedKg: 1, estimatedMeals: 2, collections: 1 },
+      { date: '2026-02', collectedKg: 2, estimatedMeals: 4, collections: 2 },
+    ];
+    await route.fulfill({ response, json });
+  });
+  await page.goto('/impact');
+  await expect(page.locator('.impact-dashboard')).toHaveAttribute('aria-busy', 'false');
+  const trend = page.locator('.trend-panel');
+  const path = trend.locator('.trend-line');
+  await expect(trend).toHaveCSS('opacity', '0');
+  await expect.poll(() => path.evaluate((el) => parseFloat(getComputedStyle(el).strokeDashoffset))).toBeGreaterThan(0);
+  await trend.scrollIntoViewIfNeeded();
+  await expect(trend).toHaveCSS('opacity', '1');
+  await expect.poll(() => path.evaluate((el) => parseFloat(getComputedStyle(el).strokeDashoffset))).toBe(0);
+
+  const food = page.locator('.impact-card').filter({ has: page.getByRole('heading', { name: 'Most rescued foods' }) });
+  await expect(food).toHaveCSS('opacity', '0');
+  await food.scrollIntoViewIfNeeded();
+  await expect(food).toHaveCSS('opacity', '1');
+  await expect(food.locator('.chart-fill').first()).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(food).toHaveCSS('opacity', '1');
+
+  await page.getByRole('link', { name: 'Browse food', exact: true }).click();
+  await expect(page).toHaveURL(/\/browse$/);
+  await page.getByRole('link', { name: 'Impact dashboard', exact: true }).click();
+  await expect(page.locator('.impact-dashboard')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.locator('.trend-panel')).toHaveCSS('opacity', '0');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect.poll(() => page.locator('.impact-card').evaluateAll((cards) => cards.every((card) => Number(getComputedStyle(card).opacity) === 1))).toBe(true);
+  await page.getByRole('link', { name: 'Browse food', exact: true }).click();
+  await page.getByRole('link', { name: 'Impact dashboard', exact: true }).click();
+  await expect(page.locator('.impact-dashboard')).toHaveAttribute('aria-busy', 'false');
+  await expect.poll(() => page.locator('.impact-card').evaluateAll((cards) => cards.every((card) => Number(getComputedStyle(card).opacity) === 1))).toBe(true);
 });

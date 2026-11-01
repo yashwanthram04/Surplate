@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount,ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { MotionConfig } from 'motion-v';
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import { api } from './api';
@@ -12,6 +12,12 @@ const session = useSession();
 const route = useRoute();
 const router = useRouter();
 const menuOpen = ref(false);
+const menuToggle = ref(null);
+
+function closeMenu() {
+  menuOpen.value = false;
+  menuToggle.value?.focus();
+}
 
 // Keep the tab title in step with the page; the detail view sets its own.
 watch(
@@ -89,6 +95,37 @@ watch(() => route.path, (path) => {
 const needTimer = setInterval(refreshNeedCount, 30 * 1000);
 onBeforeUnmount(() => clearInterval(needTimer));
 
+const browseLinks = [
+  { to: '/browse', label: 'Browse food', icon: 'bi-basket2' },
+  { to: '/fridges', label: 'Community fridges', icon: 'bi-snow' },
+];
+const impactLink = { to: '/impact', label: 'Impact dashboard', icon: 'bi-bar-chart' };
+const needsLink = computed(() => ({ to: '/needs', label: 'Charity Needs Board', icon: 'bi-heart', count: newNeedCount.value, badgeId: 'need-count' }));
+const alertsLink = computed(() => ({ to: '/spoiled-alerts', label: 'Spoiled alerts', icon: 'bi-shield-exclamation', count: alertCount.value, testId: 'nav-alerts', badgeId: 'alert-count' }));
+const primaryLinks = computed(() => {
+  if (session.isBakery) return [
+    { to: '/my-listings', label: 'My listings', icon: 'bi-grid' },
+    { to: '/orders', label: 'Orders', icon: 'bi-bag-check' },
+    impactLink,
+  ];
+  if (session.isAdmin) return [
+    { to: '/admin/charities', label: 'Verify charities', icon: 'bi-patch-check' },
+    { to: '/admin/appeals', label: 'Appeals', icon: 'bi-chat-square-text', count: appealCount.value, testId: 'nav-appeals', badgeId: 'appeal-count' },
+    impactLink,
+  ];
+  return [
+    ...browseLinks,
+    ...(session.isVerifiedCharity ? [needsLink.value] : []),
+    ...(session.isLoggedIn ? [{ to: '/reservations', label: 'My reservations', icon: 'bi-bag-check' }, impactLink] : []),
+  ];
+});
+const communityLinks = computed(() => {
+  if (session.isBakery) return [...browseLinks, needsLink.value,
+    { to: `/bakeries/${session.user.id}`, label: 'Thank-you wall', icon: 'bi-chat-heart', testId: 'nav-wall' }, alertsLink.value];
+  if (session.isAdmin) return [...browseLinks, alertsLink.value];
+  return [];
+});
+
 async function logout() {
   await session.logout();
   router.push('/');
@@ -98,10 +135,11 @@ async function logout() {
 <template>
   <a class="visually-hidden-focusable position-absolute p-2 bg-white" href="#main">Skip to content</a>
 
-  <nav class="navbar navbar-expand-lg navbar-surplate sticky-top">
+  <nav class="navbar navbar-surplate workspace-navbar sticky-top" :class="[session.isLoggedIn ? 'navbar-expand-xl' : 'navbar-expand-lg', { 'workspace-single-row': !communityLinks.length }]" @keydown.esc="closeMenu">
     <div class="container-fluid px-3 px-lg-4">
       <RouterLink class="navbar-brand brand-mark fs-4" to="/"><i class="bi bi-basket2-fill me-1" aria-hidden="true"></i>Surplate</RouterLink>
       <button
+        ref="menuToggle"
         class="navbar-toggler"
         type="button"
         aria-controls="main-nav"
@@ -109,47 +147,39 @@ async function logout() {
         aria-label="Toggle navigation"
         @click="menuOpen = !menuOpen"
       >
-        <span class="navbar-toggler-icon"></span>
+        <span class="workspace-menu-label">Menu</span><span class="navbar-toggler-icon"></span>
       </button>
 
-      <div id="main-nav" class="navbar-collapse collapse" :class="{ show: menuOpen }">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><RouterLink class="nav-link" to="/browse">Browse food</RouterLink></li>
-          <li class="nav-item"><RouterLink class="nav-link" to="/fridges">Community fridges</RouterLink></li>
-          <li v-if="session.isBakery || session.isVerifiedCharity" class="nav-item">
-            <RouterLink class="nav-link" to="/needs">Charity Needs Board<span v-if="newNeedCount" class="badge text-bg-danger ms-1" data-testid="need-count">{{ newNeedCount }}</span></RouterLink>
-          </li>
-          <template v-if="session.isBakery">
-            <li class="nav-item"><RouterLink class="nav-link" to="/listings/new">Post surplus</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/my-listings">My listings</RouterLink></li>
-            <li class="nav-item"><RouterLink class="nav-link" to="/orders">Orders</RouterLink></li>
-            <!-- REVIEWS FEATURE -->
-            <li class="nav-item"><RouterLink class="nav-link" :to="`/bakeries/${session.user.id}`" data-testid="nav-wall">Thank-you wall</RouterLink></li>
-          </template>
-          <li v-if="session.isLoggedIn" class="nav-item"><RouterLink class="nav-link" to="/impact">Impact dashboard</RouterLink></li>
-          <li v-if="session.isLoggedIn && !session.isAdmin && !session.isBakery" class="nav-item"><RouterLink class="nav-link" to="/reservations">My reservations</RouterLink></li>
-          <li v-if="session.isAdmin" class="nav-item"><RouterLink class="nav-link" to="/admin/charities">Verify charities</RouterLink></li>
-          <!-- REVIEWS FEATURE -->
-          <li v-if="session.isAdmin" class="nav-item">
-            <RouterLink class="nav-link" to="/admin/appeals" data-testid="nav-appeals">Appeals<span v-if="appealCount" class="badge text-bg-danger ms-1" data-testid="appeal-count">{{ appealCount }}</span></RouterLink>
-          </li>
-          <li v-if="session.isBakery || session.isAdmin" class="nav-item">
-            <RouterLink class="nav-link" to="/spoiled-alerts" data-testid="nav-alerts">Spoiled alerts<span v-if="alertCount" class="badge text-bg-danger ms-1" data-testid="alert-count">{{ alertCount }}</span></RouterLink>
-          </li>
-        </ul>
+      <div id="main-nav" class="navbar-collapse collapse" :class="{ show: menuOpen }" @click="menuOpen = false">
+        <div class="workspace-primary">
+          <ul class="navbar-nav workspace-primary-links" :aria-label="session.isBakery ? 'Bakery workspace' : session.isAdmin ? 'Administration' : 'Main links'">
+            <li v-for="link in primaryLinks" :key="link.to" class="nav-item">
+              <RouterLink class="nav-link" :to="link.to" :data-testid="link.testId"><i class="bi" :class="link.icon" aria-hidden="true"></i>{{ link.label }}<span v-if="link.count" class="badge text-bg-danger" :data-testid="link.badgeId">{{ link.count }}</span></RouterLink>
+            </li>
+          </ul>
+          <RouterLink v-if="session.isBakery" class="btn btn-primary workspace-post" to="/listings/new"><i class="bi bi-plus-lg" aria-hidden="true"></i>Post surplus</RouterLink>
+        </div>
+        <div v-if="communityLinks.length" class="workspace-secondary">
+          <span class="workspace-community-label">Community</span>
+          <ul class="navbar-nav workspace-community-links" aria-label="Community">
+            <li v-for="link in communityLinks" :key="link.to" class="nav-item">
+              <RouterLink class="nav-link" :to="link.to" :data-testid="link.testId"><i class="bi" :class="link.icon" aria-hidden="true"></i>{{ link.label }}<span v-if="link.count" class="badge text-bg-danger" :data-testid="link.badgeId">{{ link.count }}</span></RouterLink>
+            </li>
+          </ul>
+        </div>
 
         <div v-if="session.ready" class="d-flex align-items-center gap-2 flex-wrap" data-testid="account-nav">
           <template v-if="session.user">
             <RouterLink to="/profile" class="text-decoration-none d-flex align-items-center gap-2 me-1" data-testid="account-link">
-              <span class="fw-semibold text-body">{{ session.user.name }}</span>
-              <span class="badge text-bg-light border">{{ ROLE_LABELS[session.user.role] }}</span>
+              <span class="workspace-avatar" aria-hidden="true">{{ session.user.name.slice(0, 1).toUpperCase() }}</span>
+              <span class="workspace-account-copy"><span class="workspace-account-name" :title="session.user.name">{{ session.user.name }}</span><span class="workspace-account-role">{{ ROLE_LABELS[session.user.role] }}</span></span>
               <span v-if="session.isCharity && !session.isVerifiedCharity" class="badge text-bg-warning" title="Waiting for an admin to verify your charity">Pending</span>
             </RouterLink>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-testid="logout" @click="logout">Log out</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-testid="logout" aria-label="Log out" title="Log out" @click="logout"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="workspace-logout-label">Log out</span></button>
           </template>
           <template v-else>
-            <RouterLink to="/login" class="btn btn-sm btn-outline-primary" data-testid="nav-login">Log in</RouterLink>
-            <RouterLink to="/register" class="btn btn-sm btn-primary" data-testid="nav-register">Sign up</RouterLink>
+            <RouterLink to="/login" class="btn btn-sm btn-outline-primary workspace-auth" data-testid="nav-login"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>Log in</RouterLink>
+            <RouterLink to="/register" class="btn btn-sm btn-primary workspace-auth" data-testid="nav-register"><i class="bi bi-person-plus" aria-hidden="true"></i>Sign up</RouterLink>
           </template>
         </div>
       </div>
