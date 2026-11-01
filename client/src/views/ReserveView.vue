@@ -8,11 +8,13 @@ import { now } from '../composables/useNow';
 import { formatWindow } from '../utils/time';
 import { openSlots } from '../utils/slots';
 import { reservationErrors } from '../utils/reservations';
+import { dropIn, popIn, riseIn, shake } from '../utils/motion';
 const props = defineProps({ id: { type: String, required: true } });
 const router = useRouter();
 const listing = ref(null), reliability = ref(null), loading = ref(true), busy = ref(false), error = ref(''), submitted = ref(false);
 const form = reactive({ quantity: 1, slotStart: '' });
 const serverErrors = ref({});
+const formEl = ref(null);
 
 const slots = computed(() => (listing.value ? openSlots(listing.value, now.value) : []));
 const max = computed(() => Math.min(500, listing.value?.quantityRemaining ?? 0));
@@ -36,7 +38,7 @@ onBeforeUnmount(() => clearInterval(refresh));
 
 async function reserve() {
   submitted.value = true; serverErrors.value = {}; error.value = '';
-  if (Object.keys(errors.value).length) return;
+  if (Object.keys(errors.value).length) { shake(formEl.value); return; }
   busy.value = true;
   try {
     const { data } = await api.post('/reservations', { listingId: props.id, quantity: Number(form.quantity), slotStart: form.slotStart });
@@ -44,6 +46,7 @@ async function reserve() {
   } catch (e) {
     serverErrors.value = fieldErrors(e);
     error.value = errorMessage(e);
+    shake(formEl.value);
     loadListing(); // stock may have changed under us
   } finally { busy.value = false; }
 }
@@ -53,17 +56,21 @@ async function reserve() {
     <RouterLink :to="{ name: 'listing', params: { id } }">Back to listing</RouterLink>
     <h1 class="h3 mt-3">Reserve food</h1>
     <p v-if="loading" role="status">Loading listing…</p>
-    <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
+    <Transition :css="false" @enter="dropIn">
+      <div v-if="error" :key="error" class="alert alert-danger" role="alert">{{ error }}</div>
+    </Transition>
     <ReliabilityNotice v-if="reliability" :reliability="reliability" />
-    <form v-if="listing" class="bg-white border rounded-4 p-4" novalidate @submit.prevent="reserve">
+    <Transition appear :css="false" @enter="riseIn">
+    <form v-if="listing" ref="formEl" class="bg-white border rounded-4 p-4" novalidate @submit.prevent="reserve">
       <h2 class="h4">{{ listing.itemName }}</h2>
       <p class="mb-1">{{ listing.bakery.name }} · {{ listing.address }}</p>
       <p class="mb-1">Pickup window: {{ formatWindow(listing.pickupStart, listing.pickupEnd) }} · {{ listing.slotMinutes }}-minute slots</p>
-      <p><strong data-testid="reserve-available">{{ listing.quantityRemaining }}</strong> available · {{ listing.weightGramsPerUnit || 'Unknown' }} g per unit</p>
+      <p><Transition :css="false" @enter="popIn"><strong :key="listing.quantityRemaining" class="d-inline-block" data-testid="reserve-available">{{ listing.quantityRemaining }}</strong></Transition> available · {{ listing.weightGramsPerUnit || 'Unknown' }} g per unit</p>
       <div v-if="unavailable" class="alert alert-warning">This listing is fully reserved, closed, or needs its unit weight added by the bakery.</div>
       <ReservationFields v-else v-model:quantity="form.quantity" v-model:slot-start="form.slotStart" id-prefix="reserve" :slots="slots" :max="max" :errors="errors" />
       <p class="small text-body-secondary">Show your reservation code at the counter during your slot. If you don't collect within 15 minutes after your slot ends, the food goes back on the board and counts as a missed pickup.</p>
       <button class="btn btn-primary" :disabled="busy || unavailable || reliabilityStops">{{ busy ? 'Reserving…' : 'Confirm reservation' }}</button>
     </form>
+    </Transition>
   </div>
 </template>

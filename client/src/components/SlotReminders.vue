@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useSession } from '../stores/session';
 import { formatSlot } from '../utils/slots';
 import { spacedCode } from '../utils/reservations';
+import { collapseOut, dropIn } from '../utils/motion';
 
 // In-app reminders for collection slots starting within 30 minutes (the server's /reservations/upcoming window),
 // plus an optional browser notification while Surplate is open in a tab.
@@ -70,14 +71,15 @@ onBeforeUnmount(() => clearInterval(timer));
 </script>
 
 <template>
-  <div v-if="visible.length" class="container-fluid px-3 px-lg-4 pt-3" aria-live="polite">
+  <TransitionGroup v-if="visible.length" appear tag="div" class="container-fluid px-3 px-lg-4 pt-3" aria-live="polite" :css="false" @enter="dropIn" @leave="collapseOut">
     <div v-for="r in visible" :key="r.key" class="alert alert-info d-flex align-items-start gap-2 mb-2 py-2" data-testid="slot-reminder">
-      <i class="bi bi-alarm mt-1" aria-hidden="true"></i>
+      <!-- the alarm icon rings as the reminder drops in -->
+      <i class="bi bi-alarm mt-1 d-inline-block" data-anim="icon" aria-hidden="true"></i>
       <div class="me-auto d-flex flex-wrap align-items-center column-gap-2 row-gap-1">
         <span>{{ r.text }} <RouterLink :to="r.link" class="alert-link">{{ r.linkText }}</RouterLink></span>
         <button v-if="permission === 'default'" type="button" class="btn btn-sm btn-outline-primary" @click="enableNotifications">Notify me in this browser</button>
       </div>
       <button type="button" class="btn-close mt-1" aria-label="Dismiss reminder" @click="dismiss(r.key)"></button>
     </div>
-  </div>
+  </TransitionGroup>
 </template>

@@ -10,6 +10,7 @@ import { now } from '../composables/useNow';
 import { formatDateTime } from '../utils/time';
 import { formatSlot, openSlots } from '../utils/slots';
 import { STATUS_BADGE, reservationErrors, spacedCode } from '../utils/reservations';
+import { collapseOut, dropIn, expandIn, popIn, riseIn } from '../utils/motion';
 const session = useSession();
 const reviews = useReviews(); // REVIEWS FEATURE
 const route = useRoute();
@@ -17,8 +18,10 @@ const items = ref([]), page = ref(1), total = ref(0), loading = ref(true), error
 const reliability = ref(null);
 const justReserved = computed(() => items.value.find((r) => r.id === route.query.reserved && r.status === 'reserved'));
 
-async function load() {
-  loading.value = true; error.value = '';
+// quiet: refresh in place (after cancel/change) so the list animates the change instead of reloading.
+async function load({ quiet = false } = {}) {
+  if (!quiet) loading.value = true;
+  error.value = '';
   try {
     const { data } = await api.get('/reservations/mine', { params: { page: page.value } });
     items.value = data.items; total.value = data.total;
@@ -32,7 +35,7 @@ async function cancel(row) {
   try {
     await api.post(`/reservations/${row.id}/cancel`);
     notice.value = 'Reservation cancelled. The food is back on the board.';
-    await load();
+    await load({ quiet: true });
   } catch (e) { error.value = errorMessage(e); }
   finally { busy.value = false; }
 }
@@ -56,7 +59,7 @@ async function saveEdit() {
     await api.patch(`/reservations/${editing.id}`, { quantity: Number(editing.quantity), slotStart: editing.slotStart });
     editing.id = '';
     notice.value = 'Reservation updated.';
-    await load();
+    await load({ quiet: true });
   } catch (e) { editing.serverErrors = fieldErrors(e); editing.error = errorMessage(e); }
   finally { busy.value = false; }
 }
@@ -74,19 +77,27 @@ onMounted(load);
       <RouterLink v-if="session.isBakery" to="/orders" class="btn btn-outline-primary btn-sm">Open orders</RouterLink>
     </div>
     <p class="text-body-secondary">{{ session.isBakery ? 'Every reservation for your listings, including collections, cancellations and missed pickups.' : 'Show your code at the counter during your collection slot. You can change a reservation until its slot ends.' }}</p>
-    <div v-if="justReserved" class="alert alert-success" role="status" data-testid="reserved-banner">
-      Reserved! Your code is <strong class="font-monospace fs-5">{{ spacedCode(justReserved.code) }}</strong>. Collect {{ formatSlot(justReserved.slotStart, justReserved.slotEnd) }}.
-    </div>
+    <Transition appear :css="false" @enter="dropIn">
+      <div v-if="justReserved" class="alert alert-success" role="status" data-testid="reserved-banner">
+        <i class="bi bi-bag-check-fill me-1 d-inline-block" data-anim="icon" aria-hidden="true"></i>
+        Reserved! Your code is <strong class="font-monospace fs-5"><span class="visually-hidden">{{ spacedCode(justReserved.code) }}</span><span class="code-flip" aria-hidden="true"><span v-for="(c, i) in spacedCode(justReserved.code)" :key="i" class="d-inline-block" data-anim="char">{{ c === ' ' ? '\u00a0' : c }}</span></span></strong>. Collect {{ formatSlot(justReserved.slotStart, justReserved.slotEnd) }}.
+      </div>
+    </Transition>
     <ReliabilityNotice v-if="reliability" :reliability="reliability" />
     <div v-if="error" class="alert alert-danger" role="alert">{{ error }} <button class="btn btn-sm btn-outline-danger" @click="load">Retry</button></div>
-    <div v-if="notice" class="alert alert-success" role="status">{{ notice }}</div>
+    <Transition :css="false" @enter="dropIn">
+      <div v-if="notice" :key="notice" class="alert alert-success" role="status">{{ notice }}</div>
+    </Transition>
     <p v-if="loading" role="status">Loading reservations…</p>
     <template v-else>
       <div v-if="!items.length && !error" class="bg-white border rounded-4 p-4">No reservations yet. <RouterLink v-if="!session.isBakery" to="/browse">Browse food</RouterLink></div>
-      <article v-for="row in items" :key="row.id" class="bg-white border rounded-4 p-3 mb-3" data-testid="reservation-row">
+      <TransitionGroup appear :css="false" @enter="riseIn" @leave="collapseOut">
+      <article v-for="(row, index) in items" :key="row.id" :data-index="index" class="bg-white border rounded-4 p-3 mb-3" data-testid="reservation-row">
         <div class="d-flex justify-content-between gap-3">
           <h2 class="h5">{{ row.itemName }}</h2>
-          <span class="badge align-self-start" :class="STATUS_BADGE[status(row)]">{{ status(row) }}</span>
+          <Transition :css="false" @enter="popIn">
+            <span :key="status(row)" class="badge align-self-start" :class="STATUS_BADGE[status(row)]">{{ status(row) }}</span>
+          </Transition>
         </div>
         <p class="mb-1">{{ session.isBakery ? row.recipientName : row.bakeryName }} · {{ row.quantity }} units · {{ row.weightKg.toFixed(2) }} kg</p>
         <p class="small mb-1">{{ row.address }}</p>
@@ -105,6 +116,7 @@ onMounted(load);
           Not collected<template v-if="row.missedAt">: released {{ row.releasedBy === 'bakery' ? 'by the bakery' : 'automatically' }} {{ formatDateTime(row.missedAt) }}</template>. The food went back on the board.
         </p>
 
+        <Transition :css="false" @enter="expandIn" @leave="collapseOut">
         <form v-if="editing.id === row.id" class="border-top pt-3 mt-2" novalidate @submit.prevent="saveEdit">
           <div v-if="editing.error" class="alert alert-danger py-2" role="alert">{{ editing.error }}</div>
           <p v-if="!editing.listing && !editing.error" role="status">Loading…</p>
@@ -117,11 +129,13 @@ onMounted(load);
             <button type="button" class="btn btn-outline-secondary btn-sm" @click="editing.id = ''">Keep as is</button>
           </div>
         </form>
-        <div v-else-if="!session.isBakery && status(row) === 'reserved'" class="d-flex gap-2 mt-2">
+        </Transition>
+        <div v-if="editing.id !== row.id && !session.isBakery && status(row) === 'reserved'" class="d-flex gap-2 mt-2">
           <button v-if="canChange(row)" class="btn btn-outline-primary btn-sm" :disabled="busy" @click="startEdit(row)">Change</button>
           <button class="btn btn-outline-danger btn-sm" :disabled="busy" @click="cancel(row)">Cancel reservation</button>
         </div>
       </article>
+      </TransitionGroup>
       <nav v-if="total > 20" class="d-flex align-items-center gap-3" aria-label="Reservation pages">
         <button class="btn btn-outline-secondary" :disabled="page === 1 || busy" @click="move(-1)">Previous</button>
         <span>Page {{ page }} of {{ Math.ceil(total / 20) }}</span>
@@ -130,3 +144,7 @@ onMounted(load);
     </template>
   </div>
 </template>
+
+<style scoped>
+.code-flip { perspective: 400px; }
+</style>
