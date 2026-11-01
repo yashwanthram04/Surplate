@@ -19,6 +19,7 @@ export async function connectDb({ uri = process.env.MONGODB_URI, forceMemory = f
     if (!forceMemory) console.log('No MONGODB_URI set: using a temporary in-memory MongoDB (data is lost on restart).');
   }
   await mongoose.connect(uri);
+  if (!usingMemory) console.log(`Connected to MongoDB: ${mongoose.connection.name} @ ${mongoose.connection.host}`);
   // Make sure the 2dsphere index exists before the first geo query.
   await Promise.all(Object.values(mongoose.models).map((m) => m.init()));
   return {
