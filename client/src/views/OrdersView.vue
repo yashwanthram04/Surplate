@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import ConfirmModal from '../components/ConfirmModal.vue';
@@ -7,6 +7,7 @@ import { now } from '../composables/useNow';
 import { formatDateTime, formatRemaining } from '../utils/time';
 import { formatSlot } from '../utils/slots';
 import { STATUS_BADGE, spacedCode } from '../utils/reservations';
+import { collapseOut, dropIn, popIn, riseIn, shake, successPulse } from '../utils/motion';
 
 const VIEWS = [
   { id: 'open', label: 'To collect', empty: 'No open orders right now.' },
@@ -18,6 +19,9 @@ const view = ref('open'), counts = ref({});
 const orders = ref([]), loading = ref(true), error = ref(''), notice = ref('');
 const code = ref(''), found = ref(null), lookupError = ref(''), busy = ref(false);
 const releasing = ref(null), releaseError = ref('');
+const codeInput = ref(null), resultEl = ref(null);
+// Shake the code box whenever a lookup or confirmation fails.
+watch(lookupError, (msg) => { if (msg) shake(codeInput.value); });
 
 let latest = 0;
 async function load() {
@@ -76,6 +80,7 @@ async function confirmCollection() {
   try {
     const { data } = await api.post(`/reservations/${found.value.id}/collect`, { code: found.value.code });
     found.value = data;
+    nextTick(() => successPulse(resultEl.value));
     notice.value = `Collection confirmed: ${data.quantity} × ${data.itemName} for ${data.recipientName}.`;
     code.value = '';
     await load();
@@ -101,23 +106,28 @@ async function release() {
       <RouterLink to="/reservations" class="btn btn-outline-secondary btn-sm">Order history</RouterLink>
     </div>
     <p class="text-body-secondary">Ask the customer for their reservation code to confirm a collection. Orders not collected within 15 minutes after their slot are released automatically. You can release a no-show sooner once the slot has started.</p>
-    <div v-if="notice" class="alert alert-success" role="status">{{ notice }}</div>
+    <Transition :css="false" @enter="dropIn">
+      <div v-if="notice" :key="notice" class="alert alert-success" role="status"><i class="bi bi-check-circle-fill me-1 d-inline-block" data-anim="icon" aria-hidden="true"></i>{{ notice }}</div>
+    </Transition>
 
     <section class="bg-white border rounded-4 p-3 p-md-4 mb-4" aria-labelledby="code-title">
       <h2 id="code-title" class="h5">Confirm a collection</h2>
       <form class="d-flex flex-wrap gap-2 align-items-start" novalidate @submit.prevent="lookup">
         <div>
           <label for="reservation-code" class="visually-hidden">Reservation code</label>
-          <input id="reservation-code" v-model="code" class="form-control form-control-lg font-monospace text-uppercase" style="max-width: 12rem"
+          <input id="reservation-code" ref="codeInput" v-model="code" class="form-control form-control-lg font-monospace text-uppercase" style="max-width: 12rem"
             placeholder="ABC 123" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" />
         </div>
         <button class="btn btn-primary btn-lg" :disabled="busy">Find order</button>
       </form>
       <div v-if="lookupError" class="alert alert-danger mt-3 mb-0" role="alert">{{ lookupError }}</div>
-      <div v-if="found" class="border rounded-3 p-3 mt-3" data-testid="lookup-result">
+      <Transition :css="false" @enter="riseIn">
+      <div v-if="found" ref="resultEl" :key="found.id" class="border rounded-3 p-3 mt-3" data-testid="lookup-result">
         <div class="d-flex justify-content-between gap-2">
           <strong>{{ found.quantity }} × {{ found.itemName }}</strong>
-          <span class="badge align-self-start" :class="STATUS_BADGE[found.status]">{{ found.status }}</span>
+          <Transition :css="false" @enter="popIn">
+            <span :key="found.status" class="badge align-self-start" :class="STATUS_BADGE[found.status]">{{ found.status }}</span>
+          </Transition>
         </div>
         <div>For {{ found.recipientName }} ({{ found.recipientRole }}) · code <span class="font-monospace text-nowrap">{{ spacedCode(found.code) }}</span></div>
         <div class="small text-body-secondary">Slot {{ formatSlot(found.slotStart, found.slotEnd) }}</div>
@@ -127,12 +137,13 @@ async function release() {
         </template>
         <p v-else-if="found.status === 'collected'" class="small mt-2 mb-0">Collected {{ formatDateTime(found.collectedAt) }}. <RouterLink to="/ratings">Rate this customer</RouterLink> <!-- REVIEWS FEATURE --></p>
       </div>
+      </Transition>
     </section>
 
     <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Filter orders">
       <button v-for="v in VIEWS" :key="v.id" type="button" class="btn btn-sm" :class="view === v.id ? 'btn-primary' : 'btn-outline-secondary'"
         :aria-pressed="view === v.id" :data-testid="`orders-${v.id}`" @click="show(v.id)">
-        {{ v.label }} <span class="badge rounded-pill ms-1" :class="view === v.id ? 'text-bg-light' : 'text-bg-secondary'">{{ counts[v.id] ?? '–' }}</span>
+        {{ v.label }} <Transition :css="false" @enter="popIn"><span :key="counts[v.id] ?? '–'" class="badge rounded-pill ms-1 d-inline-block" :class="view === v.id ? 'text-bg-light' : 'text-bg-secondary'">{{ counts[v.id] ?? '–' }}</span></Transition>
       </button>
     </div>
     <p v-if="view === 'due'" class="small text-body-secondary">Open orders that will be released back to the board within {{ DUE_SOON_MINUTES }} minutes if nobody collects them.</p>
@@ -140,21 +151,22 @@ async function release() {
     <div v-if="error" class="alert alert-danger" role="alert">{{ error }} <button class="btn btn-sm btn-outline-danger" @click="load">Retry</button></div>
     <p v-if="loading" role="status">Loading orders…</p>
     <div v-else-if="!orders.length && !error" class="bg-white border rounded-4 p-4">{{ VIEWS.find((v) => v.id === view).empty }}</div>
-    <ul v-else-if="view === 'missed'" class="list-unstyled bg-white border rounded-4 px-3 mb-3">
-      <li v-for="o in orders" :key="o.id" class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 border-bottom" data-testid="order-row">
+    <TransitionGroup v-else-if="view === 'missed'" appear tag="ul" :css="false" class="list-unstyled bg-white border rounded-4 px-3 mb-3" @enter="riseIn" @leave="collapseOut">
+      <li v-for="(o, index) in orders" :key="o.id" :data-index="index" class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 border-bottom" data-testid="order-row">
         <span>
           <strong>{{ o.quantity }} × {{ o.itemName }}</strong> · {{ o.recipientName }} <span class="text-body-secondary small">({{ o.recipientRole }})</span>
           <span class="d-block small text-body-secondary">Slot {{ formatSlot(o.slotStart, o.slotEnd) }} · code <span class="font-monospace text-nowrap">{{ spacedCode(o.code) }}</span></span>
         </span>
         <span class="small text-danger">Released {{ o.releasedBy === 'bakery' ? 'by staff' : 'automatically' }} {{ formatDateTime(o.missedAt) }}</span>
       </li>
-    </ul>
-    <section v-for="s in (view === 'missed' ? [] : slots)" :key="s.key" class="bg-white border rounded-4 p-3 mb-3" data-testid="order-slot">
+    </TransitionGroup>
+    <TransitionGroup v-if="!loading && view !== 'missed'" appear tag="div" :css="false" @enter="riseIn" @leave="collapseOut">
+    <section v-for="(s, index) in slots" :key="s.key" :data-index="index" class="bg-white border rounded-4 p-3 mb-3" data-testid="order-slot">
       <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
         <h3 class="h6 mb-0">{{ formatSlot(s.start, s.end) }}</h3>
         <span class="small" :class="slotState(s).cls">{{ slotState(s).text }}</span>
       </div>
-      <ul class="list-unstyled mb-0">
+      <TransitionGroup tag="ul" class="list-unstyled mb-0" :css="false" @enter="riseIn" @leave="collapseOut">
         <li v-for="o in s.orders" :key="o.id" class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top py-2" data-testid="order-row">
           <span>
             <strong>{{ o.quantity }} × {{ o.itemName }}</strong> · {{ o.recipientName }} <span class="text-body-secondary small">({{ o.recipientRole }})</span>
@@ -162,8 +174,9 @@ async function release() {
           </span>
           <button class="btn btn-outline-danger btn-sm" :disabled="busy || !started(o)" :title="started(o) ? '' : 'Available once the slot starts'" @click="releasing = o; releaseError = ''">Release no-show</button>
         </li>
-      </ul>
+      </TransitionGroup>
     </section>
+    </TransitionGroup>
 
     <ConfirmModal v-if="releasing" title="Release this order?" confirm-text="Release to board" danger :busy="busy" :error="releaseError" @confirm="release" @cancel="releasing = null">
       {{ releasing.quantity }} × <strong>{{ releasing.itemName }}</strong> for {{ releasing.recipientName }} goes back on the board and counts as a missed pickup for them.
