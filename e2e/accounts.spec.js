@@ -231,6 +231,7 @@ test.describe('charity verification', () => {
     await expect(charityPage.getByTestId('verification-banner')).toContainText('Verified charity');
     await expect(charityPage.getByTestId('account-nav')).not.toContainText('Pending');
     await charityPage.getByTestId('logout').click();
+    await expect(charityPage.getByTestId('nav-login')).toBeVisible();
     await logIn(charityPage, rejectMe.email, PASSWORD);
     await expect(charityPage.getByTestId('verification-banner')).toContainText('We could not find this registration number.');
     await other.close();
