@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
@@ -54,7 +56,9 @@ async function reserve() {
 <template>
   <div class="mx-auto" style="max-width: 640px">
     <RouterLink :to="{ name: 'listing', params: { id } }">Back to listing</RouterLink>
-    <h1 class="h3 mt-3">Reserve food</h1>
+    <SiteBanner compact icon="bi-bag-heart-fill">
+      <BouncingHeading class="h3 mt-3" text="Reserve food" />
+    </SiteBanner>
     <p v-if="loading" role="status">Loading listing…</p>
     <Transition :css="false" @enter="dropIn">
       <div v-if="error" :key="error" class="alert alert-danger" role="alert">{{ error }}</div>

@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
@@ -80,11 +82,13 @@ onMounted(load);
 </script>
 <template>
   <div class="mx-auto" style="max-width: 1100px">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-      <h1 class="h3">{{ session.isBakery ? 'Order history' : 'My reservations' }}</h1>
-      <RouterLink v-if="session.isBakery" to="/orders" class="btn btn-outline-primary btn-sm">Open orders</RouterLink>
-    </div>
-    <p class="text-body-secondary">{{ session.isBakery ? 'Every reservation for your listings, including collections, cancellations and missed pickups.' : 'Show your code at the counter during your collection slot. You can change a reservation until its slot ends.' }}</p>
+    <SiteBanner compact icon="bi-bag-heart-fill">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <BouncingHeading class="h3" :text="session.isBakery ? 'Order history' : 'My reservations'" />
+        <RouterLink v-if="session.isBakery" to="/orders" class="btn btn-outline-primary btn-sm">Open orders</RouterLink>
+      </div>
+      <p class="text-body-secondary">{{ session.isBakery ? 'Every reservation for your listings, including collections, cancellations and missed pickups.' : 'Show your code at the counter during your collection slot. You can change a reservation until its slot ends.' }}</p>
+    </SiteBanner>
     <Transition appear :css="false" @enter="dropIn">
       <div v-if="justReserved" class="alert alert-success" role="status" data-testid="reserved-banner">
         <i class="bi bi-bag-check-fill me-1 d-inline-block" data-anim="icon" aria-hidden="true"></i>

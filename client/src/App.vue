@@ -5,6 +5,7 @@ import { api } from './api';
 import { ROLE_LABELS } from './constants';
 import { useSession } from './stores/session';
 import SlotReminders from './components/SlotReminders.vue';
+import FridgeBackdrop from './components/FridgeBackdrop.vue';
 import ReviewPrompt from './components/ReviewPrompt.vue'; // REVIEWS FEATURE
 
 const session = useSession();
@@ -186,6 +187,7 @@ async function logout() {
   </nav>
 
   <SlotReminders v-if="session.ready" />
+  <FridgeBackdrop v-if="route.name !== 'home'" />
   <ReviewPrompt v-if="session.ready" />
   <main id="main" :class="route.meta.fullWidth ? '' : 'container-fluid px-3 px-lg-4 py-4'">
     <!-- soft cross-fade between pages (opacity + blur only: a transform here would skew ScrollTrigger's pin measurements) -->

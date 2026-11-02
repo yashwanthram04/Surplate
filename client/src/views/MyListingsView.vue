@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
@@ -115,13 +117,15 @@ const badge = (l) => {
 
 <template>
     <div ref="page" class="mx-auto" style="max-width: 1000px">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-enter>
-        <div>
-          <h1 class="h3 mb-0">My listings</h1>
-          <div class="text-body-secondary small">{{ session.user?.name }}</div>
+      <SiteBanner icon="bi-basket2-fill">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-enter>
+          <div>
+            <BouncingHeading class="h3 mb-0" text="My listings" />
+            <div class="text-body-secondary small">{{ session.user?.name }}</div>
+          </div>
+          <RouterLink to="/listings/new" class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Post surplus food</RouterLink>
         </div>
-        <RouterLink to="/listings/new" class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Post surplus food</RouterLink>
-      </div>
+      </SiteBanner>
 
       <div v-if="flash" class="alert alert-success alert-dismissible" role="status" data-testid="flash">
         {{ flash }}

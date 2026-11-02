@@ -235,7 +235,7 @@ onBeforeUnmount(() => {
 
     <template v-else-if="bakery">
       <!-- hero -->
-      <header ref="heroEl" class="wall-hero mt-3">
+      <header ref="heroEl" class="wall-hero site-illustrated-banner mt-3">
         <!-- layers at different depths: they drift apart as the page scrolls and lean after the mouse -->
         <span class="hero-layer" data-depth="1.1" aria-hidden="true"><span class="blob blob-a"></span></span>
         <span class="hero-layer" data-depth="-0.6" aria-hidden="true"><span class="blob blob-b"></span></span>

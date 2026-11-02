@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { errorMessage, fieldErrors } from '../api';
@@ -91,8 +93,10 @@ function focusFirstError() {
 
 <template>
   <div class="mx-auto" style="max-width: 640px">
-    <h1 class="h3 mb-1">Create your account</h1>
-    <p class="text-body-secondary">Already have one? <RouterLink to="/login">Log in</RouterLink></p>
+    <SiteBanner compact icon="bi-person-plus-fill">
+      <BouncingHeading class="h3 mb-1" text="Create your account" />
+      <p class="text-body-secondary">Already have one? <RouterLink to="/login">Log in</RouterLink></p>
+    </SiteBanner>
 
     <form class="bg-white border rounded-4 p-3 p-md-4" novalidate data-testid="register-form" @submit.prevent="submit">
       <div v-if="failure" class="alert alert-danger" role="alert" data-testid="register-error">{{ failure }}</div>

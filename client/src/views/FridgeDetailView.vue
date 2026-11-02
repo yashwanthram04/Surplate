@@ -1,9 +1,10 @@
 <script setup>
+import SiteBanner from '../components/SiteBanner.vue';
+import BouncingHeading from '../components/BouncingHeading.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage } from '../api';
 import ConfirmModal from '../components/ConfirmModal.vue';
-import FridgeBackdrop from '../components/FridgeBackdrop.vue';
 import FridgeMap from '../components/FridgeMap.vue';
 import FridgeMascot from '../components/FridgeMascot.vue';
 import FridgeStatusBadge from '../components/FridgeStatusBadge.vue';
@@ -126,7 +127,6 @@ async function remove() {
 
 <template>
   <div class="mx-auto" style="max-width: 1100px">
-    <FridgeBackdrop />
     <RouterLink :to="{ name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All community fridges</RouterLink>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
@@ -141,6 +141,10 @@ async function remove() {
     <div v-else-if="error" class="alert alert-danger mt-3" role="alert">{{ error }} <button class="btn btn-sm btn-outline-danger ms-2" @click="load">Retry</button></div>
 
     <template v-else-if="fridge">
+      <SiteBanner class="mt-3" icon="bi-snow">
+        <BouncingHeading class="h3 mb-1" :text="fridge.name" />
+        <p class="mb-0">{{ fridge.address }}</p>
+      </SiteBanner>
       <div v-if="flash" class="alert alert-success alert-dismissible mt-3" role="status" data-testid="flash">
         {{ flash }}
         <button type="button" class="btn-close" aria-label="Dismiss" @click="flash = ''"></button>
@@ -206,7 +210,7 @@ async function remove() {
             </span>
             <FridgeMascot ref="statusMascot" class="status-mascot" :mood="fridge.latestStatus || 'unknown'" :size="92" />
             <div class="text-body-secondary small">Community fridge</div>
-            <h1 class="h3 mb-3 fridge-title" data-testid="fridge-title">{{ fridge.name }}</h1>
+            <h2 class="h3 mb-3 fridge-title" data-testid="fridge-title">{{ fridge.name }}</h2>
 
             <FridgeStatusBadge :key="fridge.latestStatus" :status="fridge.latestStatus" large />
             <div class="small mt-2" data-testid="last-updated" :title="fridge.latestUpdateAt ? formatDateTime(fridge.latestUpdateAt) : ''">

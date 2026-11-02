@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { onMounted, ref, watch } from 'vue';
 import { api, errorMessage, fieldErrors } from '../api';
 import ConfirmModal from '../components/ConfirmModal.vue';
@@ -62,8 +64,10 @@ const tabs = [
 
 <template>
   <div class="mx-auto" style="max-width: 900px">
-    <h1 class="h3 mb-1">Block appeals</h1>
-    <p class="text-body-secondary">Recipients are blocked from reserving after repeated missed pickups. Approving lets them reserve again (one at a time) for 7 days.</p>
+    <SiteBanner compact icon="bi-chat-heart-fill">
+      <BouncingHeading class="h3 mb-1" text="Block appeals" />
+      <p class="text-body-secondary">Recipients are blocked from reserving after repeated missed pickups. Approving lets them reserve again (one at a time) for 7 days.</p>
+    </SiteBanner>
 
     <div v-if="flash" class="alert alert-success alert-dismissible" role="status" data-testid="flash">
       {{ flash }}<button type="button" class="btn-close" aria-label="Dismiss" @click="flash = ''"></button>

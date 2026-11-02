@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import NeedForm from './NeedsForm.vue';
 import MyPledges from './MyPledges.vue';
 import NeedCard from './NeedsCard.vue';
@@ -324,12 +326,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="mx-auto" style="max-width: 1100px">
-    <div class="mb-4">
-      <h1 class="h3">Charity Needs Board</h1>
-      <p class="text-body-secondary">
-        Charities can share their food needs, and bakeries can pledge surplus food to help meet them.
-      </p>
-    </div>
+    <SiteBanner icon="bi-heart-fill">
+      <div class="mb-4">
+        <BouncingHeading class="h3" text="Charity Needs Board" />
+        <p class="text-body-secondary">
+          Charities can share their food needs, and bakeries can pledge surplus food to help meet them.
+        </p>
+      </div>
+    </SiteBanner>
 
     <!-- Charity: post a new need -->
     <NeedForm
