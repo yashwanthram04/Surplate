@@ -7,11 +7,13 @@ import { useReviews } from '../stores/reviews';
 import { useSession } from '../stores/session';
 import { burst } from '../utils/confetti';
 import { ACCURACY_LABELS, COMPLIMENTS, FOOD_LABELS, LIMITS, MOODS, defaultNickname, reviewErrors } from '../utils/reviews';
+import { vMagnetic } from '../utils/wallMotion';
 import StarRating from './StarRating.vue';
 import ThankYouNote from './ThankYouNote.vue';
 
 // "Say thanks": rate the food and the listing, write a short note and see it on a live preview of the sticky note
 // before it goes on the bakery's wall. Charities can thank on behalf of the people they serve.
+// With `pickup.review` (the author's own note) the same form edits that note instead.
 const props = defineProps({ pickup: { type: Object, required: true } });
 const emit = defineEmits(['close']);
 
@@ -20,7 +22,12 @@ const reviews = useReviews();
 const router = useRouter();
 const isCharity = computed(() => session.isCharity);
 
-const form = reactive({ foodRating: 0, accuracyRating: 0, note: '', nickname: '', onBehalf: false, onBehalfOf: '', peopleServed: '' });
+const existing = props.pickup.review ?? null;
+const editing = !!existing;
+const form = reactive(editing
+  ? { foodRating: existing.foodRating, accuracyRating: existing.accuracyRating, note: existing.note, nickname: existing.nickname,
+      onBehalf: !!existing.onBehalfOf, onBehalfOf: existing.onBehalfOf ?? '', peopleServed: existing.peopleServed ?? '' }
+  : { foodRating: 0, accuracyRating: 0, note: '', nickname: '', onBehalf: false, onBehalfOf: '', peopleServed: '' });
 const submitted = ref(false);
 const serverErrors = reactive({});
 const failure = ref('');
@@ -64,10 +71,19 @@ async function submit() {
   if (Object.keys(clientErrors.value).length) return;
   busy.value = true;
   try {
-    const { data } = await api.post('/reviews', {
-      reservationId: props.pickup.reservationId, note: form.note, foodRating: form.foodRating, accuracyRating: form.accuracyRating, nickname: form.nickname,
+    const payload = {
+      note: form.note, foodRating: form.foodRating, accuracyRating: form.accuracyRating, nickname: form.nickname,
       ...(isCharity.value && form.onBehalf ? { onBehalfOf: form.onBehalfOf, peopleServed: form.peopleServed === '' ? undefined : Number(form.peopleServed) } : {}),
-    });
+    };
+    const { data } = editing
+      ? await api.patch(`/reviews/${existing.id}`, payload)
+      : await api.post('/reviews', { reservationId: props.pickup.reservationId, ...payload });
+    if (editing) {
+      // Straight back to the wall, where the note flips over to show the change.
+      reviews.posted(data);
+      emit('close');
+      return;
+    }
     posted.value = data;
     await nextTick();
     burst(dialog.value?.querySelector('[data-testid="posted-check"]'));
@@ -107,8 +123,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
         <!-- success -->
         <div v-if="posted" class="text-center py-4 posted">
           <div class="posted-check" data-testid="posted-check" aria-hidden="true"><i class="bi bi-check-lg"></i></div>
-          <h2 id="review-title" class="h4 mt-3">Thank you!</h2>
-          <p class="text-body-secondary mb-4">Your note is now on <strong>{{ pickup.bakeryName }}</strong>’s Thank-you Wall, where their team will read it.</p>
+          <h2 id="review-title" class="h4 mt-3">{{ editing ? 'Note updated' : 'Thank you!' }}</h2>
+          <p v-if="editing" class="text-body-secondary mb-4">Your changes are on <strong>{{ pickup.bakeryName }}</strong>’s Thank-you Wall.</p>
+          <p v-else class="text-body-secondary mb-4">Your note is now on <strong>{{ pickup.bakeryName }}</strong>’s Thank-you Wall, where their team will read it.</p>
           <div class="posted-note mx-auto mb-4"><ThankYouNote :note="posted" preview /></div>
           <div class="d-flex justify-content-center gap-2 flex-wrap">
             <button type="button" class="btn btn-primary" data-testid="see-wall" @click="seeWall"><i class="bi bi-chat-heart me-1" aria-hidden="true"></i>See it on the wall</button>
@@ -120,9 +137,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
         <form v-else novalidate @submit.prevent="submit">
           <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
             <div>
-              <div class="section-kicker">Say thanks</div>
+              <div class="section-kicker">{{ editing ? 'Edit your note' : 'Say thanks' }}</div>
               <h2 id="review-title" class="h4 mb-0 font-display">How was your {{ pickup.itemName }}?</h2>
-              <div class="small text-body-secondary">from {{ pickup.bakeryName }} · {{ pickup.quantity }} {{ pickup.quantity === 1 ? 'unit' : 'units' }}</div>
+              <div class="small text-body-secondary">from {{ pickup.bakeryName }}<template v-if="pickup.quantity"> · {{ pickup.quantity }} {{ pickup.quantity === 1 ? 'unit' : 'units' }}</template></div>
             </div>
             <span :key="mood" class="review-mood" aria-hidden="true">{{ mood }}</span>
           </div>
@@ -196,8 +213,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 
           <div class="d-flex justify-content-end gap-2 mt-3">
             <button type="button" class="btn btn-outline-secondary" :disabled="busy" @click="emit('close')">Not now</button>
-            <button ref="submitBtn" class="btn btn-primary" :disabled="busy" data-testid="send-thanks">
-              <span v-if="busy" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span><i v-else class="bi bi-heart-fill me-1" aria-hidden="true"></i>Post to the wall
+            <button ref="submitBtn" v-magnetic="0.2" class="btn btn-primary" :disabled="busy" data-testid="send-thanks">
+              <span v-if="busy" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span><i v-else class="bi me-1" :class="editing ? 'bi-check2' : 'bi-heart-fill'" aria-hidden="true"></i>{{ editing ? 'Save changes' : 'Post to the wall' }}
             </button>
           </div>
         </form>

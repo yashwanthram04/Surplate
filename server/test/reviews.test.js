@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import mongoose from 'mongoose';
 import Appeal from '../src/models/Appeal.js';
 import Listing from '../src/models/Listing.js';
 import Reservation from '../src/models/Reservation.js';
+import Review from '../src/models/Review.js';
 import User from '../src/models/User.js';
 import { slotsFor } from '../src/utils/slots.js';
 import { defaultNickname } from '../src/utils/validateReview.js';
@@ -148,6 +150,77 @@ describe('leaving a thank-you', () => {
     const r = await pickup(as);
     await Reservation.updateOne({ _id: r.id }, { collectedAt: new Date(Date.now() - 31 * 86400000) });
     assert.equal((await thank(as, r.id)).status, 409);
+  });
+});
+
+describe('the author: edit and delete their own note', () => {
+  test('the author can edit their note and the change is saved in the database; the pin and reply stay', async () => {
+    const as = await newRecipient();
+    const made = await body(await thank(as, (await pickup(as)).id));
+    await call(`/reviews/${made.id}/pin`, sunrise, {}, 'PATCH');
+    await call(`/reviews/${made.id}/reply`, sunrise, { text: 'Come again!' }, 'PUT');
+
+    const edited = await body(await call(`/reviews/${made.id}`, as, { note: 'Edited: even better the next day', foodRating: 3, accuracyRating: 5, nickname: 'Case' }, 'PATCH'));
+    assert.equal(edited.http, 200);
+    assert.equal(edited.note, 'Edited: even better the next day');
+    assert.equal(edited.nickname, 'Case');
+    assert.equal(edited.pinned, true);
+    assert.equal(edited.reply.text, 'Come again!');
+
+    const saved = await Review.findById(made.id).lean();
+    assert.equal(saved.note, 'Edited: even better the next day');
+    assert.equal(saved.foodRating, 3);
+    assert.equal(saved.accuracyRating, 5);
+    await call(`/reviews/${made.id}/pin`, sunrise, { pinned: false }, 'PATCH'); // leave Sunrise's pins as the seed had them
+  });
+
+  test('edits are validated, and only the author can edit (not other recipients or the bakery)', async () => {
+    const as = await newRecipient();
+    const made = await body(await thank(as, (await pickup(as)).id));
+    const refused = await body(await call(`/reviews/${made.id}`, as, { note: 'x', foodRating: 0, accuracyRating: 9 }, 'PATCH'));
+    assert.equal(refused.http, 422);
+    assert.deepEqual(Object.keys(refused.fields).sort(), ['accuracyRating', 'foodRating', 'note']);
+    assert.equal((await call(`/reviews/${made.id}`, await newRecipient(), GOOD, 'PATCH')).status, 404);
+    assert.equal((await call(`/reviews/${made.id}`, sunrise, GOOD, 'PATCH')).status, 403);
+    assert.equal((await call(`/reviews/${made.id}`, null, GOOD, 'PATCH')).status, 401);
+    assert.equal((await Review.findById(made.id).lean()).note, GOOD.note, 'a refused edit changes nothing');
+  });
+
+  test('a charity can drop the "on behalf of" details when editing', async () => {
+    const charity = await newRecipient('charity');
+    const made = await body(await thank(charity, (await pickup(charity)).id, { onBehalfOf: 'our seniors', peopleServed: 30 }));
+    const edited = await body(await call(`/reviews/${made.id}`, charity, GOOD, 'PATCH'));
+    assert.equal(edited.onBehalfOf, null);
+    assert.equal(edited.peopleServed, null);
+    const saved = await Review.findById(made.id).lean();
+    assert.equal(saved.peopleServed, undefined);
+  });
+
+  test('notes older than 30 days can no longer be edited', async () => {
+    const as = await newRecipient();
+    const made = await body(await thank(as, (await pickup(as)).id));
+    await Review.collection.updateOne({ _id: new mongoose.Types.ObjectId(made.id) }, { $set: { createdAt: new Date(Date.now() - 31 * 86400000) } });
+    assert.equal((await call(`/reviews/${made.id}`, as, GOOD, 'PATCH')).status, 409);
+  });
+
+  test('the author can delete their note: it leaves the database and the wall, and the pickup can be thanked again', async () => {
+    const as = await newRecipient();
+    const r = await pickup(as);
+    const made = await body(await thank(as, r.id));
+    const before = (await body(await ctx.call(`/reviews/bakery/${sunriseId}`))).reputation.thankYouCount;
+
+    assert.equal((await call(`/reviews/${made.id}`, await newRecipient(), undefined, 'DELETE')).status, 404);
+    assert.equal((await call(`/reviews/${made.id}`, sunrise, undefined, 'DELETE')).status, 403);
+    assert.ok(await Review.exists({ _id: made.id }), 'refused deletes leave the note');
+
+    assert.equal((await call(`/reviews/${made.id}`, as, undefined, 'DELETE')).status, 204);
+    assert.equal(await Review.exists({ _id: made.id }), null);
+    const wall = await body(await ctx.call(`/reviews/bakery/${sunriseId}`));
+    assert.equal(wall.reputation.thankYouCount, before - 1);
+    assert.ok(!wall.items.some((n) => n.id === made.id));
+    assert.ok((await body(await ctx.call('/reviews/pending', { as }))).items.some((p) => p.reservationId === r.id));
+    assert.equal((await call(`/reviews/${made.id}`, as, undefined, 'DELETE')).status, 404, 'deleting twice is a 404');
+    assert.equal((await call(`/reviews/not-an-id`, as, undefined, 'DELETE')).status, 404);
   });
 });
 

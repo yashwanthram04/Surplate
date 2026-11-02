@@ -4,9 +4,10 @@ import { api, errorMessage, fieldErrors } from '../api';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import ReliabilityGauge from '../components/ReliabilityGauge.vue';
 import { formatDateTime } from '../utils/time';
+import { stamp } from '../utils/wallMotion';
 
 // Admins review blocked recipients' appeals. Approving lifts the block for a week; declining needs a reason
-// the recipient will see.
+// the recipient will see. The decision is stamped onto the appeal card before it leaves the queue.
 const tab = ref('pending');
 const items = ref([]);
 const counts = ref({ pending: 0, approved: 0, denied: 0 });
@@ -43,6 +44,8 @@ async function decide(appeal, decision, reason = '') {
     flash.value = `${appeal.userName}’s appeal was ${decision === 'approve' ? 'approved: they can reserve for the next 7 days' : 'declined'}.`;
     target.value = null;
     note.value = '';
+    const card = document.querySelector(`[data-appeal-id="${appeal.id}"]`);
+    await stamp(card, decision === 'approve' ? 'Approved' : 'Declined', decision === 'approve' ? 'good' : 'bad');
     await load();
   } catch (e) {
     noteError.value = fieldErrors(e).note || errorMessage(e);
@@ -83,7 +86,7 @@ const tabs = [
     </div>
 
     <TransitionGroup v-else name="rate" tag="ul" class="rate-list list-unstyled d-grid gap-3">
-      <li v-for="a in items" :key="a.id" class="bg-white border rounded-4 p-3" data-testid="appeal-row">
+      <li v-for="a in items" :key="a.id" class="appeal-card bg-white border rounded-4 p-3" :data-appeal-id="a.id" data-testid="appeal-row">
         <div class="d-flex flex-wrap gap-3 align-items-start">
           <ReliabilityGauge :score="a.snapshot?.score ?? null" :size="84" />
           <div class="flex-grow-1" style="min-width: 220px">

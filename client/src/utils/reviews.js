@@ -41,11 +41,33 @@ export const TIERS = {
 /** "good" | "warn" | "bad" | "new": drives the colour of gauges and bars. */
 export const scoreTone = (score) => (score == null ? 'new' : score >= 80 ? 'good' : score >= 50 ? 'warn' : 'bad');
 
-/** A stable colour and tilt per note, so the wall looks hand-placed but never jumps on re-render. */
+/**
+ * A stable colour, tilt and sway per note, so the wall looks hand-placed but never jumps on re-render.
+ * sway: how much (and which way) this note flutters when the wall is scrolled, 0.7 to 1.15 either way.
+ */
 export function noteLook(id) {
   let h = 0;
   for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return { tone: h % 6, tilt: (((h >> 3) % 5) - 2) * 0.7 };
+  return {
+    tone: h % 6,
+    tilt: (((h >>> 3) % 5) - 2) * 0.7, // >>> keeps it unsigned, so the tilt stays within ±1.4°
+    sway: ((h >>> 6) % 2 ? 1 : -1) * (0.7 + ((h >>> 8) % 4) * 0.15),
+  };
+}
+
+/**
+ * The quotes for the ticker under the wall's hero: one per note (up to `max`), cut to `length` characters, then
+ * repeated until there are at least `min` so the strip is always wider than the screen. Repeats are marked, so
+ * screen readers and the keyboard only meet each quote once.
+ */
+export function tickerItems(notes, { min = 8, max = 12, length = 70 } = {}) {
+  const unique = notes.filter((n) => n.note).slice(0, max).map((n) => ({
+    id: n.id, nickname: n.nickname, stars: n.foodRating, repeat: false,
+    text: n.note.length > length ? `${n.note.slice(0, length - 1).trimEnd()}…` : n.note,
+  }));
+  const items = [...unique];
+  while (unique.length && items.length < min) items.push({ ...unique[items.length % unique.length], repeat: true });
+  return items;
 }
 
 /** "just now", "12 min ago", "3 h ago", "2 d ago", else a date. */

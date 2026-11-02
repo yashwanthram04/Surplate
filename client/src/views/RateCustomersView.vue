@@ -7,10 +7,13 @@ import { useSession } from '../stores/session';
 import { formatSlot } from '../utils/slots';
 import { burst } from '../utils/confetti';
 import { LIMITS, PUNCTUALITY_LABELS, initialOf, timeAgo } from '../utils/reviews';
+import { stamp, useSmoothScroll } from '../utils/wallMotion';
 
 // Bakery staff rate the customers they handed food to: how punctual were they? Ratings feed the customer's
-// reliability score. Each card flies off the list once rated, and a progress bar fills as the queue empties.
+// reliability score. A "Rated" stamp lands on each card before it flies off the list, and a progress bar fills as
+// the queue empties.
 const session = useSession();
+useSmoothScroll();
 const items = ref([]);
 const total = ref(0); // how many were waiting when the page opened, for the progress bar
 const loading = ref(true);
@@ -40,6 +43,7 @@ async function load() {
 
 async function submit(item, event) {
   const d = draft(item.reservationId);
+  const card = event.target.closest('.rate-card'); // found now: the form inside it is replaced once rated
   d.error = '';
   if (!d.punctuality) { d.error = 'Choose a star rating first.'; return; }
   if (d.comment.trim().length > LIMITS.commentMax) { d.error = `Keep the comment under ${LIMITS.commentMax} characters.`; return; }
@@ -49,7 +53,8 @@ async function submit(item, event) {
     d.done = true;
     rated.value++;
     burst(event.target, { emojis: ['⭐', '✨', '👍'], count: 10, spread: 130 });
-    setTimeout(() => (items.value = items.value.filter((i) => i.reservationId !== item.reservationId)), 650);
+    await stamp(card, 'Rated');
+    setTimeout(() => (items.value = items.value.filter((i) => i.reservationId !== item.reservationId)), 400);
   } catch (e) {
     d.error = fieldErrors(e).punctuality || fieldErrors(e).comment || errorMessage(e);
     if (e.response?.status === 409) setTimeout(() => (items.value = items.value.filter((i) => i.reservationId !== item.reservationId)), 1500);

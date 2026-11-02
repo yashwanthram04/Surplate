@@ -1,21 +1,27 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
+import ConfirmModal from '../components/ConfirmModal.vue';
 import CountUp from '../components/home/CountUp.vue';
 import ReliabilityGauge from '../components/ReliabilityGauge.vue';
 import StarRating from '../components/StarRating.vue';
 import ThankYouNote from '../components/ThankYouNote.vue';
+import ThankYouTicker from '../components/ThankYouTicker.vue';
 import { useReviews } from '../stores/reviews';
 import { useSession } from '../stores/session';
 import { burst } from '../utils/confetti';
 import { TIERS, scoreTone } from '../utils/reviews';
+import { crumple, flipNote, glow, heroParallax, onceInView, scrollToEl, sway, useSmoothScroll, vMagnetic, writeIn } from '../utils/wallMotion';
 
 // A bakery's public Thank-you Wall: its reliability, the totals, and every note recipients have left, pinned
-// ones first. The bakery's own staff see pin and reply controls on each note.
+// ones first. The bakery's own staff see pin and reply controls on each note; a note's author can edit or delete it.
+// Motion: Lenis smooth scrolling, a parallax hero, a ticker of quotes, notes that sway as the page scrolls and
+// rating bars that fill when they come into view (see utils/wallMotion.js).
 const props = defineProps({ id: { type: String, required: true } });
 const session = useSession();
 const reviews = useReviews();
+useSmoothScroll();
 
 const bakery = ref(null);
 const reputation = ref(null);
@@ -33,6 +39,19 @@ const busy = ref(false);
 const actionError = ref('');
 const toRate = ref(0);
 const barsReady = ref(false);
+const wallEl = ref(null);
+const titleEl = ref(null);
+const heroEl = ref(null);
+const barsEl = ref(null);
+let stopWriting = () => {};
+let stopHero = () => {};
+let stopBars = () => {};
+let stopSway = () => {};
+const stopScenery = () => {
+  stopWriting();
+  stopHero();
+  stopBars();
+};
 
 const isOwner = computed(() => session.user?.id === props.id && session.isBakery);
 const tier = computed(() => TIERS[reputation.value?.tier] ?? TIERS.new);
@@ -49,6 +68,7 @@ const shown = computed(() => notes.value.filter((n) => (filter.value === 'pinned
 const maxStar = computed(() => Math.max(1, ...Object.values(reputation.value?.stars ?? {})));
 
 async function load() {
+  stopScenery();
   loading.value = true;
   notFound.value = false;
   error.value = '';
@@ -71,7 +91,10 @@ async function load() {
   } finally {
     loading.value = false;
     await nextTick();
-    requestAnimationFrame(() => requestAnimationFrame(() => (barsReady.value = true)));
+    stopWriting = writeIn(titleEl.value);
+    stopHero = heroParallax(heroEl.value);
+    // The rating bars grow once they are on screen (two frames later, so they start from empty).
+    stopBars = onceInView(barsEl.value, () => requestAnimationFrame(() => requestAnimationFrame(() => (barsReady.value = true))));
   }
 }
 async function loadToRate() {
@@ -126,12 +149,78 @@ async function reply(note, text, done) {
   }
 }
 
+// ---- the author: edit, delete ---------------------------------------------------------------
+const noteEl = (id) => wallEl.value?.querySelector(`[data-note-id="${id}"]`);
+/** Totals and averages after a note changes, without reloading the wall. */
+async function refreshSummary() {
+  try {
+    const { data } = await api.get(`/reviews/bakery/${props.id}`, { params: { page: 1 } });
+    reputation.value = data.reputation;
+    total.value = data.total;
+  } catch { /* the numbers catch up on the next visit */ }
+}
+function editNote(note) {
+  reviews.open({ reservationId: `edit-${note.id}`, bakeryId: props.id, bakeryName: bakery.value.name, itemName: note.itemName, review: note });
+}
+/** Glides to a note (showing every note first if a filter hides it) and makes it glow. */
+async function jumpTo(id) {
+  if (!shown.value.some((n) => n.id === id)) filter.value = 'all';
+  await nextTick();
+  const el = noteEl(id);
+  await scrollToEl(el);
+  glow(el?.querySelector('.note-paper'));
+}
+// A note posted or edited through the form (from this page or the banner) shows up here straight away: the wall
+// glides to it, an edited note flips over to show its new words, and it glows.
+watch(() => reviews.lastPosted, async (saved) => {
+  if (!saved || saved.bakeryId !== props.id) return;
+  const known = notes.value.some((n) => n.id === saved.id);
+  if (known) notes.value = notes.value.map((n) => (n.id === saved.id ? saved : n));
+  else place(saved);
+  refreshSummary();
+  await nextTick();
+  await scrollToEl(noteEl(saved.id));
+  if (known) await flipNote(noteEl(saved.id));
+  glow(noteEl(saved.id)?.querySelector('.note-paper'));
+});
+
+const removing = ref(null); // the note waiting for "are you sure?"
+const removeError = ref('');
+function askRemove(note) {
+  removeError.value = '';
+  removing.value = note;
+}
+async function confirmRemove() {
+  const note = removing.value;
+  busy.value = true;
+  removeError.value = '';
+  try {
+    await api.delete(`/reviews/${note.id}`);
+    removing.value = null;
+    await crumple(noteEl(note.id));
+    notes.value = notes.value.filter((n) => n.id !== note.id);
+    refreshSummary();
+    reviews.refresh(); // the pickup is waiting for a thank-you again
+  } catch (e) {
+    removeError.value = errorMessage(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 watch(() => props.id, load);
-onMounted(load);
+onMounted(() => {
+  stopSway = sway(wallEl.value);
+  load();
+});
+onBeforeUnmount(() => {
+  stopScenery();
+  stopSway();
+});
 </script>
 
 <template>
-  <div class="mx-auto wall" style="max-width: 1150px">
+  <div ref="wallEl" class="mx-auto wall" style="max-width: 1150px">
     <RouterLink to="/browse" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Browse food</RouterLink>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
@@ -146,13 +235,15 @@ onMounted(load);
 
     <template v-else-if="bakery">
       <!-- hero -->
-      <header class="wall-hero mt-3">
-        <span class="blob blob-a" aria-hidden="true"></span>
-        <span class="blob blob-b" aria-hidden="true"></span>
+      <header ref="heroEl" class="wall-hero mt-3">
+        <!-- layers at different depths: they drift apart as the page scrolls and lean after the mouse -->
+        <span class="hero-layer" data-depth="1.1" aria-hidden="true"><span class="blob blob-a"></span></span>
+        <span class="hero-layer" data-depth="-0.6" aria-hidden="true"><span class="blob blob-b"></span></span>
+        <span class="hero-layer hero-confetti" data-depth="0.45" aria-hidden="true"><span>💛</span><span>🥐</span><span>✨</span><span>🍞</span><span>💛</span></span>
         <div class="row g-4 align-items-center position-relative">
           <div class="col-12 col-md">
             <div class="section-kicker">Thank-you Wall</div>
-            <h1 class="font-display wall-title" data-testid="wall-title">{{ bakery.name }}</h1>
+            <h1 ref="titleEl" class="font-display wall-title" data-testid="wall-title">{{ bakery.name }}</h1>
             <div v-if="bakery.address" class="text-body-secondary mb-3"><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>{{ bakery.address }}</div>
             <span class="tier-badge" :class="`tier-${reputation.tier}`" data-testid="tier"><i class="bi" :class="tier.icon" aria-hidden="true"></i> {{ tier.label }}</span>
             <div v-if="isOwner" class="d-flex flex-wrap gap-2 mt-3">
@@ -163,10 +254,12 @@ onMounted(load);
             </div>
           </div>
           <div class="col-12 col-md-auto d-flex justify-content-center">
-            <ReliabilityGauge :score="reputation.score" :size="150" label="Bakery reliability" />
+            <div data-hero-gauge><ReliabilityGauge :score="reputation.score" :size="150" label="Bakery reliability" /></div>
           </div>
         </div>
       </header>
+
+      <ThankYouTicker v-if="notes.length >= 2" :notes="notes" class="mt-3" @pick="jumpTo" />
 
       <!-- numbers -->
       <div class="row g-3 mt-1">
@@ -184,7 +277,7 @@ onMounted(load);
 
       <div class="row g-3 mt-1">
         <div class="col-12 col-lg-5">
-          <div class="bg-white border rounded-4 p-3 h-100">
+          <div ref="barsEl" class="bg-white border rounded-4 p-3 h-100">
             <h2 class="h6 mb-3">Food ratings</h2>
             <div v-for="s in [5, 4, 3, 2, 1]" :key="s" class="d-flex align-items-center gap-2 mb-1 small">
               <span class="text-nowrap" style="width: 2.2rem">{{ s }} <i class="bi bi-star-fill text-warning" aria-hidden="true"></i></span>
@@ -206,7 +299,7 @@ onMounted(load);
       <div v-if="waiting" class="thanks-prompt mt-3" data-testid="wall-prompt">
         <span class="thanks-prompt-emoji" aria-hidden="true">💛</span>
         <div class="me-auto"><strong>You collected {{ waiting.itemName }} here.</strong><span class="d-block small text-body-secondary">Leave a thank-you and it appears on this wall.</span></div>
-        <button type="button" class="btn btn-primary btn-sm" @click="reviews.open(waiting)">Say thanks</button>
+        <button v-magnetic type="button" class="btn btn-primary btn-sm" @click="reviews.open(waiting)">Say thanks</button>
       </div>
 
       <!-- the wall -->
@@ -228,8 +321,12 @@ onMounted(load);
       <p v-else-if="!shown.length" class="text-body-secondary py-4 text-center">No notes match this filter yet.</p>
 
       <TransitionGroup v-else name="note" tag="div" class="wall-grid">
-        <ThankYouNote v-for="(n, i) in shown" :key="n.id" :note="n" :index="i" :manage="isOwner" :pins-left="pinsLeft" :busy="busy" @pin="togglePin" @reply="reply" />
+        <ThankYouNote v-for="(n, i) in shown" :key="n.id" :note="n" :index="i" :manage="isOwner" :pins-left="pinsLeft" :busy="busy" @pin="togglePin" @reply="reply" @edit="editNote" @remove="askRemove" />
       </TransitionGroup>
+
+      <ConfirmModal v-if="removing" title="Delete your note?" confirm-text="Delete note" danger :busy="busy" :error="removeError" @confirm="confirmRemove" @cancel="removing = null">
+        <p class="mb-0">“{{ removing.note }}” will be taken off {{ bakery.name }}’s wall. You can write a new thank-you for this pickup afterwards.</p>
+      </ConfirmModal>
 
       <div v-if="hasMore" class="text-center mt-4">
         <button type="button" class="btn btn-outline-primary" :disabled="loadingMore" data-testid="more-notes" @click="more">

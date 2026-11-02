@@ -87,6 +87,33 @@ router.post('/', requireRole(...RECIPIENTS), async (req, res) => {
   }
 });
 
+// ---- the author: edit or take down their own note ----------------------------------------------
+async function myReview(req, res) {
+  const review = await Review.findOne({ _id: req.params.id, author: req.user._id });
+  if (!review) res.status(404).json({ error: 'Note not found.' });
+  return review;
+}
+
+// Same rules as posting. The bakery's pin and reply stay with the note.
+router.patch('/:id', requireRole(...RECIPIENTS), async (req, res) => {
+  const { value, errors } = parseReviewInput(req.body, req.user);
+  if (Object.keys(errors).length) return bad(res, errors);
+  const review = await myReview(req, res);
+  if (!review) return;
+  if (review.createdAt < windowStart()) fail(`Notes can be changed within ${REVIEW_WINDOW_DAYS} days of posting.`);
+  Object.assign(review, value); // peopleServed: undefined clears it
+  await review.save();
+  res.json(reviewDTO(review, req.user._id));
+});
+
+// The pickup goes back to "waiting for a thank-you", so the author can write a new one.
+router.delete('/:id', requireRole(...RECIPIENTS), async (req, res) => {
+  const review = await myReview(req, res);
+  if (!review) return;
+  await review.deleteOne();
+  res.status(204).end();
+});
+
 // ---- bakery staff: pin, reply -----------------------------------------------------------------
 async function ownReview(req, res) {
   const review = await Review.findOne({ _id: req.params.id, bakery: req.user._id });

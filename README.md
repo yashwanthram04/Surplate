@@ -124,9 +124,11 @@ npm test                 # all three
 | Level | Tool | Where | What it covers |
 |---|---|---|---|
 | Unit (functions) | Vitest | `client/src/utils/__tests__/time.spec.js` | Countdown and pickup-window formatting, datetime-local conversion |
+| Unit (functions) | Vitest | `client/src/utils/__tests__/reviews.spec.js`, `wallMotion.spec.js` | Thank-you form validation (limits and edge cases), score colours, note colour/tilt/sway, ticker quotes, "time ago", default nicknames; the wall's tilt and scroll-sway maths, stamps and magnetic buttons, and that its animations stay still with reduced motion |
 | Unit (functions) | node:test | `server/test/listing-rules.test.js` | Listing validation, photo checks (by magic bytes) and who may see a listing, with no database |
-| Component | Vitest + Vue Test Utils | `client/src/components/__tests__/` (`CountdownRing`, `ListingCard`, `ListingFilters`), `components/home/__tests__/CountUp.spec.js`, `composables/__tests__/useMotion.spec.js` | One component in isolation: what it shows for each prop, what it emits, reduced motion and clean-up |
+| Component | Vitest + Vue Test Utils | `client/src/components/__tests__/` (`CountdownRing`, `ListingCard`, `ListingFilters`, `StarRating`, `ThankYouNote` (stubbed stars), `ReliabilityGauge` (stubbed counter), `ThankYouTicker`), `components/home/__tests__/CountUp.spec.js`, `composables/__tests__/useMotion.spec.js` | One component in isolation: what it shows for each prop, what it emits, reduced motion and clean-up |
 | Integration | Vitest + Vue Test Utils | `components/__tests__/ListingCardIntegration.spec.js`, `views/__tests__/BrowseView.spec.js` | Card + ring on one shared clock; the browse page with the real card and filters and a mocked API (debounce, stale responses, errors, 15 s refresh, closing windows) |
+| Integration | Vitest + Vue Test Utils | `components/__tests__/ReviewModalIntegration.spec.js`, `views/__tests__/BakeryWallView.spec.js` | The thank-you form with the real star pickers, live sticky-note preview and Pinia stores (validation, posting, charity notes, server errors, editing); the Thank-you Wall with real notes and confirm dialog for a visitor, the bakery's staff (pin, reply) and a note's author (edit, delete) |
 | API | node:test | `server/test/*.test.js` | Every route end to end against an in-memory MongoDB |
 | End to end | Playwright | `e2e/*.spec.js` | Full user journeys in a real browser |
 
@@ -204,13 +206,34 @@ Code that touches shared files is marked `REVIEWS FEATURE` in comments.
 |---|---|
 | `GET /api/reviews/bakery/:id?page=` | Anyone; reputation summary and notes (12 per page), pinned first |
 | `GET /api/reviews/pending` · `POST /api/reviews` | Charity/individual; JSON `{ reservationId, foodRating, accuracyRating, note, nickname?, onBehalfOf?, peopleServed? }` for a collected pickup; one note per pickup |
+| `PATCH /api/reviews/:id` · `DELETE /api/reviews/:id` | The note's author; edit with the same fields and rules as posting (within 30 days; the pin and reply stay) / delete, after which the pickup can be thanked again |
 | `PATCH /api/reviews/:id/pin` · `PUT /api/reviews/:id/reply` | Owning bakery; `{ pinned }` (max 3) / `{ text }` (max 140, empty clears) |
 | `GET /api/reviews/to-rate` · `POST /api/reviews/rate` | Bakery; `{ reservationId, punctuality, comment? }`, once per pickup |
 | `GET /api/reviews/me` | Recipient: reliability, recent ratings, latest appeal. Bakery: reputation |
 | `POST /api/appeals` · `GET /api/appeals?status=` · `POST /api/appeals/:id/decision` | Blocked recipient files; admin lists and decides (`approve` / `deny` with a note) |
 
 Demo data: Sunrise Bakery has five notes (one pinned, two replies, charity notes). Log in as **Alex** to see the "Say thanks" banner (one pickup waiting), as **Sunrise** to rate Alex, and as **Sam** (blocked) to file an appeal that **admin** can then decide.
-All motion respects the "reduce motion" setting. Tests: `server/test/reviews.test.js`, `e2e/reviews.spec.js`.
+Motion (GSAP + Lenis, `client/src/utils/wallMotion.js`, `ThankYouTicker.vue`):
+- **Smooth scrolling** (Lenis, fed into ScrollTrigger) on the Thank-you Wall and Rate customers.
+- **Notes sway with the scroll** like paper in a draft, each by its own amount, swinging from the tape at the top; pinned notes barely move.
+- **Parallax hero:** the background blobs and floating emoji drift at different speeds as you scroll and lean after the mouse; the reliability gauge turns as the hero leaves.
+- **Thank-you ticker:** recent quotes drift across under the hero, speed up and turn round with the scroll and slow down under the mouse; clicking one glides to that note and makes it glow.
+- The bakery's name **writes itself in** letter by letter; the **rating bars fill** when scrolled into view.
+- Notes **tilt towards the mouse** with a glint of light; an edited note **flips over**; a deleted note is **crumpled and tossed away**.
+- **Magnetic** "Say thanks" and "Post to the wall" buttons; a **rubber stamp** ("Rated", "Approved", "Declined") lands on rated customers and decided appeals.
+All motion respects the "reduce motion" setting.
+
+Tests for this feature (run all of them with `npm test`, or one level at a time):
+
+```bash
+cd client
+npx vitest run src/utils/__tests__/reviews.spec.js src/utils/__tests__/wallMotion.spec.js   # unit
+npx vitest run src/components/__tests__/StarRating.spec.js src/components/__tests__/ThankYouNote.spec.js src/components/__tests__/ReliabilityGauge.spec.js src/components/__tests__/ThankYouTicker.spec.js   # component
+npx vitest run src/components/__tests__/ReviewModalIntegration.spec.js src/views/__tests__/BakeryWallView.spec.js   # integration
+cd ..
+node --test server/test/reviews.test.js   # API + database
+npx playwright test e2e/reviews.spec.js   # end to end
+```
 
 ## Hooks for the other features
 

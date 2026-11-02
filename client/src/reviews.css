@@ -225,6 +225,52 @@
 @keyframes wall-drift {
   to { transform: translate3d(36px, 26px, 0) scale(1.1); }
 }
+/* parallax layers (utils/wallMotion.js heroParallax): GSAP moves the layer, CSS keeps animating what is inside it */
+.hero-layer { position: absolute; inset: 0; pointer-events: none; }
+.hero-confetti span {
+  position: absolute;
+  font-size: 1.5rem;
+  opacity: 0.45;
+  animation: confetti-bob 6s ease-in-out infinite alternate;
+}
+.hero-confetti span:nth-child(1) { top: 14%; left: 46%; }
+.hero-confetti span:nth-child(2) { top: 62%; left: 58%; font-size: 1.9rem; animation-delay: -2s; }
+.hero-confetti span:nth-child(3) { top: 22%; left: 70%; animation-delay: -4s; }
+.hero-confetti span:nth-child(4) { top: 74%; left: 36%; font-size: 1.2rem; animation-delay: -1s; }
+.hero-confetti span:nth-child(5) { top: 10%; left: 58%; font-size: 1.2rem; animation-delay: -3s; }
+@keyframes confetti-bob {
+  to { transform: translateY(-12px) rotate(14deg); }
+}
+
+/* the thank-you ticker (ThankYouTicker.vue) */
+.ticker {
+  overflow-x: auto;
+  padding: 0.35rem 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  scrollbar-width: none;
+}
+.ticker.is-moving { overflow: hidden; }
+.ticker-track { display: flex; width: max-content; }
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: 0.8rem; /* margin, not gap: the two copies must be spaced exactly alike for a seamless loop */
+  padding: 0.45rem 0.95rem;
+  border: 1px solid #ebe3c8;
+  border-radius: 999px;
+  background: #fffaf0;
+  color: inherit;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+.ticker-item:hover,
+.ticker-item:focus-visible { background: #fff1c9; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(60, 50, 20, 0.12); }
+.ticker-quote { font-family: 'Caveat', 'Segoe Print', cursive; font-size: 1.25rem; line-height: 1; }
+.ticker-who { font-weight: 600; font-size: 0.82rem; color: #6b654f; }
+.ticker-stars { font-size: 0.8rem; color: #b07d00; }
 .wall-title {
   font-size: clamp(2rem, 5vw, 3.1rem);
   font-weight: 700;
@@ -274,7 +320,9 @@
   background: var(--paper);
   border-radius: 3px 3px 16px 3px;
   box-shadow: 0 1px 1px rgba(60, 50, 20, 0.12), 0 10px 22px rgba(60, 50, 20, 0.13);
-  transform: rotate(var(--tilt, 0deg));
+  /* --sway comes from the scroll speed (set on the wall), --k is this note's share of it (pinned notes: almost none) */
+  transform: rotate(calc(var(--tilt, 0deg) + var(--sway, 0deg) * var(--k, 0)));
+  transform-origin: 50% 0; /* swings from the tape at the top, like paper stuck to a board */
   transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.25s ease;
 }
 .note-paper:hover {
@@ -422,6 +470,25 @@
 }
 .note-tool:hover { background: #fff; }
 .note-tool.is-active { background: #fcd978; border-color: #d9a800; }
+.note-tool-danger { color: #a3332a; }
+.note-tool-danger:hover { background: #fff; color: #842029; border-color: #e0a19b; }
+
+/* pointer tilt (utils/wallMotion.js, v-tilt): the note leans towards the mouse and a glint of light follows it */
+.note-paper.is-tilting {
+  transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-6px) scale(1.03);
+  transition: transform 0.08s linear, box-shadow 0.25s ease;
+  box-shadow: calc(var(--ry, 0deg) / 1deg * -1px) calc(14px + var(--rx, 0deg) / 1deg * 1px) 34px rgba(60, 50, 20, 0.22);
+}
+.note-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%), rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 55%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.note-paper.is-tilting .note-glare { opacity: 1; }
 .note-reply-form { width: 100%; }
 .note.is-preview { margin-bottom: 0; padding-top: 0.6rem; }
 .note.is-preview .note-paper:hover { transform: none; box-shadow: 0 1px 1px rgba(60, 50, 20, 0.12), 0 10px 22px rgba(60, 50, 20, 0.13); }
@@ -610,12 +677,45 @@
 
 /* ---------- rating customers ---------- */
 .rate-card {
+  position: relative;
+  overflow: hidden; /* keeps a rubber stamp inside the card */
   background: #fff;
   border: 1px solid #e8e4da;
   border-radius: 1rem;
   padding: 1rem 1.1rem;
   transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.2s ease;
 }
+
+/* rubber stamps (utils/wallMotion.js stamp) on rated customers and decided appeals */
+.ink-stamp {
+  position: absolute;
+  top: 50%;
+  right: 7%;
+  translate: 0 -50%; /* separate from transform, which GSAP animates */
+  z-index: 2;
+  padding: 0.2rem 0.85rem;
+  border: 4px double currentColor;
+  border-radius: 0.55rem;
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.2rem, 4vw, 1.8rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  /* a little uneven, like real ink */
+  -webkit-mask-image: radial-gradient(circle at 20% 30%, #000 55%, rgba(0, 0, 0, 0.75) 75%, #000 100%);
+  mask-image: radial-gradient(circle at 20% 30%, #000 55%, rgba(0, 0, 0, 0.75) 75%, #000 100%);
+}
+.ink-good { color: #2f7d4f; }
+.ink-bad { color: #b02a37; }
+.appeal-card { position: relative; overflow: hidden; }
+
+/* Lenis smooth scrolling (same rules as fridges.css, which only loads on the fridge pages) */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
 .rate-card:focus-within { box-shadow: 0 6px 18px rgba(40, 60, 40, 0.1); }
 .rate-card.is-done { background: var(--sp-green-soft); border-color: #b9dcc4; }
 .rate-list { position: relative; }
@@ -677,7 +777,10 @@
   .gauge-halo,
   .gauge-new,
   .wall-hero .blob,
+  .hero-confetti span,
+  .ticker-item,
   .note-paper,
+  .note-glare,
   .note-pin,
   .note-reply,
   .floaty span,
@@ -696,6 +799,7 @@
     transition: none !important;
   }
   .note-paper:hover,
+  .note-paper.is-tilting,
   .wall-stat:hover,
   .lift:hover { transform: none; }
   .prompt-enter-active,
