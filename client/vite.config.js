@@ -7,4 +7,9 @@ const apiTarget = process.env.VITE_API_PROXY || 'http://localhost:3000';
 export default defineConfig({
   plugins: [vue()],
   server: { port: Number(process.env.VITE_PORT) || 5173, proxy: { '/api': apiTarget } },
+  // Vitest: component and unit tests live next to the code in __tests__ folders (npm test)
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/__tests__/**/*.spec.js'],
+  },
 });

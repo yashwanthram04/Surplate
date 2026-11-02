@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import CountdownRing from '../components/CountdownRing.vue';
+import { useEntrance, useListMotion } from '../composables/useMotion';
 import { now } from '../composables/useNow';
 import { useSession } from '../stores/session';
 import { formatWindow, fromLocalInput, minutesFromNow, toLocalInput } from '../utils/time';
@@ -23,6 +24,12 @@ const isEnded = (l) => new Date(l.pickupEnd).getTime() < now.value;
 const active = computed(() => items.value.filter((l) => !isEnded(l)));
 const past = computed(() => items.value.filter(isEnded));
 const shown = computed(() => (tab.value === 'active' ? active.value : past.value));
+
+// Motion: cards rise in, a removed listing shrinks away and the rest close the gap (see useListMotion).
+const page = ref(null);
+const list = ref(null);
+useEntrance(page);
+const listMotion = useListMotion(list, computed(() => shown.value.map((l) => l.id).join(',')));
 
 async function load() {
   loading.value = true;
@@ -107,8 +114,8 @@ const badge = (l) => {
 </script>
 
 <template>
-    <div class="mx-auto" style="max-width: 1000px">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div ref="page" class="mx-auto" style="max-width: 1000px">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3" data-enter>
         <div>
           <h1 class="h3 mb-0">My listings</h1>
           <div class="text-body-secondary small">{{ session.user?.name }}</div>
@@ -146,8 +153,8 @@ const badge = (l) => {
         <RouterLink v-if="tab === 'active'" to="/listings/new" class="btn btn-primary">Post surplus food</RouterLink>
       </div>
 
-      <ul v-else class="list-unstyled d-grid gap-3 mb-0">
-        <li v-for="l in shown" :key="l.id" class="bg-white border rounded-4 p-3" data-testid="my-listing">
+      <TransitionGroup v-else ref="list" tag="ul" :css="false" appear class="list-unstyled d-grid gap-3 mb-0 position-relative" @before-enter="listMotion.onBeforeEnter" @enter="listMotion.onEnter" @leave="listMotion.onLeave">
+        <li v-for="(l, i) in shown" :key="l.id" class="bg-white border rounded-4 p-3" data-testid="my-listing" :data-index="i">
           <div class="row g-3 align-items-center">
             <div class="col-4 col-md-2">
               <img v-if="l.photoUrl" :src="l.photoUrl" :alt="`Photo of ${l.itemName}`" class="w-100 rounded-3" style="aspect-ratio: 1; object-fit: cover" />
@@ -170,7 +177,7 @@ const badge = (l) => {
             </div>
           </div>
         </li>
-      </ul>
+      </TransitionGroup>
 
       <ConfirmModal v-if="removing" title="Remove this listing?" confirm-text="Remove listing" danger :busy="removeBusy" :error="removeError" @confirm="confirmRemove" @cancel="removing = null">
         <strong>{{ removing.itemName }}</strong> will disappear from the board straight away. This can't be undone.
