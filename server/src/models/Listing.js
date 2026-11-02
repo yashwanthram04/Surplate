@@ -39,7 +39,9 @@ const listingSchema = new mongoose.Schema(
     },
 
     // Stored in MongoDB so the app works on hosts without a persistent disk.
+    // `photo` is the cover; `extraPhotos` are the rest of the gallery, in order (see MAX_PHOTOS in utils/validate.js).
     photo: { data: Buffer, contentType: String },
+    extraPhotos: [{ _id: false, data: Buffer, contentType: String }],
 
     // false (the default): only verified charities see it. true: the bakery shares it with everyone.
     // See utils/visibility.js for who can see what.

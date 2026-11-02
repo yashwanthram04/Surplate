@@ -4,7 +4,7 @@ import { RouterLink, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
 import ListingMap from '../components/ListingMap.vue';
-import { ALLERGENS, DIETARY_TAGS, MAX_PHOTO_BYTES } from '../constants';
+import { ALLERGENS, DIETARY_TAGS, MAX_PHOTO_BYTES, MAX_PHOTOS } from '../constants';
 import { useSession } from '../stores/session';
 import { fromLocalInput, minutesFromNow, toLocalInput } from '../utils/time';
 import { SLOT_MINUTES } from '../utils/slots';
@@ -32,9 +32,9 @@ const form = reactive({
   lat: null,
   lng: null,
 });
-const photoFile = ref(null);
-const photoPreview = ref('');
-const existingPhoto = ref('');
+const photoFiles = ref([]);
+const photoPreviews = ref([]);
+const existingPhotos = ref([]);
 const originalTimes = {};
 const photoProblem = ref('');
 const pickedAddress = ref('');
@@ -76,7 +76,7 @@ async function loadExisting() {
     });
     Object.assign(originalTimes, { pickupStart: data.pickupStart, pickupEnd: data.pickupEnd, bestBefore: data.bestBefore });
     pickedAddress.value = data.address;
-    existingPhoto.value = data.photoUrl || '';
+    existingPhotos.value = data.photoUrls?.length ? data.photoUrls : data.photoUrl ? [data.photoUrl] : [];
     notOwner.value = data.bakery.id !== session.user?.id;
   } catch (err) {
     loadError.value = err.response?.status === 404 ? 'This listing no longer exists.' : errorMessage(err);
@@ -117,12 +117,12 @@ const clientErrors = computed(() => {
   else if (!e.pickupEnd && best < end) e.bestBefore = 'Best-before must not be earlier than the end of the pickup window.';
 
   if (form.lat == null || form.lng == null) e.address = 'Choose a pickup address from the search results.';
-  if (!editing.value && !photoFile.value) e.photo = 'Add a photo of the food.';
+  if (!editing.value && !photoFiles.value.length) e.photo = 'Add a photo of the food.';
   if (photoProblem.value) e.photo = photoProblem.value;
   return e;
 });
 
-const snapshot = (field) => (field === 'photo' ? photoFile.value?.name ?? '' : field === 'address' ? `${form.address}|${form.lat}` : JSON.stringify(form[field]));
+const snapshot = (field) => (field === 'photo' ? photoFiles.value.map((f) => f.name).join('|') : field === 'address' ? `${form.address}|${form.lat}` : JSON.stringify(form[field]));
 /** Error message to show for a field: server message while the field is unchanged, else client rule once touched/submitted. */
 function err(field) {
   const s = serverErrors[field];
@@ -144,20 +144,21 @@ watch(() => form.address, (v) => {
 const previewListing = computed(() => (form.lat != null ? [{ id: 'preview', itemName: form.address, lat: form.lat, lng: form.lng }] : []));
 
 // ---- photo ---------------------------------------------------------------------------
+function clearPreviews() { photoPreviews.value.forEach((u) => URL.revokeObjectURL(u)); photoPreviews.value = []; }
 function onPhoto(e) {
-  const file = e.target.files?.[0];
+  const files = [...(e.target.files ?? [])];
   touch('photo');
   photoProblem.value = '';
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value);
-  photoPreview.value = '';
-  photoFile.value = null;
-  if (!file) return;
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) photoProblem.value = 'Photo must be a JPEG, PNG or WebP image.';
-  else if (file.size > MAX_PHOTO_BYTES) photoProblem.value = 'Photo must be 2 MB or smaller.';
-  photoFile.value = file;
-  if (!photoProblem.value) photoPreview.value = URL.createObjectURL(file);
+  clearPreviews();
+  photoFiles.value = [];
+  if (!files.length) return;
+  if (files.length > MAX_PHOTOS) photoProblem.value = `Add up to ${MAX_PHOTOS} photos.`;
+  else if (files.some((f) => !['image/jpeg', 'image/png', 'image/webp'].includes(f.type))) photoProblem.value = 'Photos must be JPEG, PNG or WebP images.';
+  else if (files.some((f) => f.size > MAX_PHOTO_BYTES)) photoProblem.value = 'Each photo must be 2 MB or smaller.';
+  photoFiles.value = files;
+  if (!photoProblem.value) photoPreviews.value = files.map((f) => URL.createObjectURL(f));
 }
-onBeforeUnmount(() => photoPreview.value && URL.revokeObjectURL(photoPreview.value));
+onBeforeUnmount(clearPreviews);
 
 function toggle(list, value) {
   const i = list.indexOf(value);
@@ -194,7 +195,7 @@ async function submit() {
   fd.append('postal', form.postal);
   fd.append('lat', form.lat);
   fd.append('lng', form.lng);
-  if (photoFile.value) fd.append('photo', photoFile.value);
+  photoFiles.value.forEach((f) => fd.append('photo', f)); // first one is the cover
 
   submitting.value = true;
   try {
@@ -318,12 +319,14 @@ async function focusFirstError() {
 
         <div class="col-12 col-lg-5">
           <div class="bg-white border rounded-4 p-3 p-md-4 mb-4">
-            <label for="photo" class="form-label fw-semibold">Photo</label>
-            <img v-if="photoPreview" :src="photoPreview" class="photo-preview d-block mb-2" alt="Preview of the chosen photo" />
-            <img v-else-if="existingPhoto" :src="existingPhoto" class="photo-preview d-block mb-2" alt="Current photo" />
-            <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" class="form-control" :class="cls('photo')" :aria-invalid="!!err('photo')" aria-describedby="photo-err" @change="onPhoto" />
+            <label for="photo" class="form-label fw-semibold">Photos</label>
+            <div v-if="photoPreviews.length || existingPhotos.length" class="d-flex flex-wrap gap-2 mb-2">
+              <img v-for="(url, i) in photoPreviews.length ? photoPreviews : existingPhotos" :key="url" :src="url" class="photo-preview"
+                :alt="`${photoPreviews.length ? 'Preview of photo' : 'Current photo'} ${i + 1}`" />
+            </div>
+            <input id="photo" type="file" multiple accept="image/jpeg,image/png,image/webp" class="form-control" :class="cls('photo')" :aria-invalid="!!err('photo')" aria-describedby="photo-err" @change="onPhoto" />
             <div id="photo-err" class="invalid-feedback">{{ err('photo') }}</div>
-            <div class="form-text">JPEG, PNG or WebP, up to 2 MB.<template v-if="editing"> Leave empty to keep the current photo.</template></div>
+            <div class="form-text">JPEG, PNG or WebP, up to 2 MB each. Pick up to {{ MAX_PHOTOS }} at once; the first is the cover.<template v-if="editing"> Leave empty to keep the current photos; choosing new ones replaces them all.</template></div>
           </div>
 
           <div class="bg-white border rounded-4 p-3 p-md-4 mb-4">

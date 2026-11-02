@@ -3,6 +3,7 @@ import { DEFAULT_SLOT_MINUTES, SLOT_MINUTES } from './slots.js';
 
 const MAX_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const MAX_PHOTOS = 5; // per listing, cover included; keep in sync with client/src/constants.js
 // Rough bounding box of Singapore; rejects coordinates that clearly aren't from OneMap.
 const SG = { minLat: 1.15, maxLat: 1.48, minLng: 103.6, maxLng: 104.1 };
 export const isInSingapore = (lat, lng) =>
@@ -98,4 +99,17 @@ export function checkPhoto(file) {
   return { photo: { data: b, contentType } };
 }
 
-export { MAX_PHOTO_BYTES };
+/** Validates 1..MAX_PHOTOS uploads. The first is the cover. Returns { photos } or { error }. */
+export function checkPhotos(files) {
+  if (!files?.length) return { error: 'A photo is required.' };
+  if (files.length > MAX_PHOTOS) return { error: `Add up to ${MAX_PHOTOS} photos.` };
+  const photos = [];
+  for (const [i, file] of files.entries()) {
+    const checked = checkPhoto(file);
+    if (checked.error) return { error: files.length > 1 ? `Photo ${i + 1}: ${checked.error}` : checked.error };
+    photos.push(checked.photo);
+  }
+  return { photos };
+}
+
+export { MAX_PHOTO_BYTES, MAX_PHOTOS };

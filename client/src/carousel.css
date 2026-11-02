@@ -1,0 +1,15 @@
+/* Photo carousel (components/PhotoCarousel.vue) */
+.pc { position: relative; }
+.pc-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.pc-track::-webkit-scrollbar { display: none; }
+.pc-slide { flex: none; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; scroll-snap-align: start; display: block; }
+.pc-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 2.4rem; height: 2.4rem; border: 0; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 1.6rem; line-height: 1; display: grid; place-items: center; cursor: pointer; }
+.pc-nav:disabled { opacity: 0; pointer-events: none; }
+.pc-nav:focus-visible, .pc-dot:focus-visible, .pc-track:focus-visible { outline: 3px solid #fff; outline-offset: -3px; box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.6); }
+.pc-prev { left: 0.6rem; }
+.pc-next { right: 0.6rem; }
+.pc-dots { position: absolute; bottom: 0.7rem; left: 0; right: 0; display: flex; justify-content: center; gap: 0.45rem; }
+.pc-dot { width: 0.6rem; height: 0.6rem; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.55); cursor: pointer; }
+.pc-dot.is-on { background: #fff; transform: scale(1.25); }
+.pc-count { position: absolute; top: 0.7rem; right: 0.7rem; padding: 0.1rem 0.55rem; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.8rem; }

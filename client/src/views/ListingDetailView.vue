@@ -6,6 +6,7 @@ import { now } from '../composables/useNow';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import CountdownRing from '../components/CountdownRing.vue';
 import ListingMap from '../components/ListingMap.vue';
+import PhotoCarousel from '../components/PhotoCarousel.vue';
 import { useSession } from '../stores/session';
 import { formatDateTime, formatWindow } from '../utils/time';
 
@@ -81,7 +82,9 @@ async function remove() {
 
       <div class="row g-4 mt-1">
         <div class="col-12 col-lg-7">
-          <img v-if="listing.photoUrl" class="w-100 rounded-4 border" style="aspect-ratio: 3 / 2; object-fit: cover" :src="listing.photoUrl" :alt="`Photo of ${listing.itemName}`" />
+          <div v-if="listing.photoUrl" class="rounded-4 border overflow-hidden">
+            <PhotoCarousel :urls="listing.photoUrls?.length ? listing.photoUrls : [listing.photoUrl]" :alt="`Photo of ${listing.itemName}`" />
+          </div>
           <div v-else class="photo-placeholder rounded-4" aria-hidden="true">🥖</div>
           <div v-if="listing.description" class="mt-3">
             <h2 class="h6">About this listing</h2>

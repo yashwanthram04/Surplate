@@ -30,6 +30,10 @@ export function toListingDTO(doc, now = new Date()) {
     lng,
     distanceKm: o.distanceM != null ? round(o.distanceM / 1000, 2) : null,
     photoUrl: o.photo?.contentType ? `/api/listings/${o._id}/photo?v=${new Date(o.updatedAt).getTime()}` : null,
+    // Every photo in gallery order, cover first. Index 0 is the same image as photoUrl.
+    photoUrls: o.photo?.contentType
+      ? [o.photo, ...(o.extraPhotos ?? [])].map((_, i) => `/api/listings/${o._id}/photo/${i}?v=${new Date(o.updatedAt).getTime()}`)
+      : [],
     createdAt: o.createdAt,
   };
 }

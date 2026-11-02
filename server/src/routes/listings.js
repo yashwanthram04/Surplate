@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import Listing, { ALLERGENS, DIETARY_TAGS } from '../models/Listing.js';
 import { requireBakery } from '../middleware/auth.js';
-import { MAX_PHOTO_BYTES, checkPhoto, parseListingInput, toList } from '../utils/validate.js';
+import { MAX_PHOTO_BYTES, MAX_PHOTOS, checkPhotos, parseListingInput, toList } from '../utils/validate.js';
 import { toListingDTO } from '../utils/serialize.js';
 import { canView, visibilityFilter } from '../utils/visibility.js';
 
@@ -15,11 +15,14 @@ const router = Router();
 const ENDING_SOON_MS = 2 * 60 * 60 * 1000; // keep in sync with client/src/constants.js
 const BROWSE_LIMIT = 100;
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PHOTO_BYTES, files: MAX_PHOTOS } });
+// The "photo" field may repeat; the first file is the cover.
 function uploadPhoto(req, res, next) {
-  upload.single('photo')(req, res, (err) => {
+  upload.array('photo', MAX_PHOTOS)(req, res, (err) => {
     if (!err) return next();
-    const message = err.code === 'LIMIT_FILE_SIZE' ? 'Photo must be 2 MB or smaller.' : 'Could not read the uploaded photo.';
+    const message = err.code === 'LIMIT_FILE_SIZE' ? 'Each photo must be 2 MB or smaller.'
+      : ['LIMIT_FILE_COUNT', 'LIMIT_UNEXPECTED_FILE'].includes(err.code) ? `Add up to ${MAX_PHOTOS} photos.`
+      : 'Could not read the uploaded photo.';
     res.status(422).json({ error: 'Please fix the highlighted fields.', fields: { photo: message } });
   });
 }
@@ -84,7 +87,7 @@ router.get('/', async (req, res) => {
   if (sortKey === 'ending') pipeline.push({ $sort: { pickupEnd: 1, _id: 1 } });
   else if (sortKey === 'newest') pipeline.push({ $sort: { createdAt: -1 } });
   else if (!hasGeo) pipeline.push({ $sort: { pickupEnd: 1, _id: 1 } }); // distance sort needs a location
-  pipeline.push({ $project: { 'photo.data': 0 } }, { $limit: BROWSE_LIMIT });
+  pipeline.push({ $project: { 'photo.data': 0, 'extraPhotos.data': 0 } }, { $limit: BROWSE_LIMIT });
 
   const docs = await Listing.aggregate(pipeline);
   res.json({ items: await attachThankYouCounts(docs.map((d) => toListingDTO(d, now))) }); // REVIEWS FEATURE: thank-you count on each card
@@ -93,37 +96,39 @@ router.get('/', async (req, res) => {
 // GET /api/listings/mine – everything the signed-in bakery has posted (including ended listings).
 router.get('/mine', requireBakery, async (req, res) => {
   const now = new Date();
-  const docs = await Listing.find({ bakery: req.user._id, status: 'active' }).select('-photo.data').sort({ pickupEnd: -1 });
+  const docs = await Listing.find({ bakery: req.user._id, status: 'active' }).select('-photo.data -extraPhotos.data').sort({ pickupEnd: -1 });
   res.json({ items: docs.map((d) => toListingDTO(d, now)) });
 });
 
-// GET /api/listings/:id/photo
-router.get('/:id/photo', async (req, res) => {
-  const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('photo bakery visibleToIndividuals priorityUntil');
-  if (!doc?.photo?.data || !canView(doc, req.user)) return res.status(404).end();
+// GET /api/listings/:id/photo[/:n] – n is the position in the gallery, 0 (the default) being the cover.
+router.get('/:id/photo{/:n}', async (req, res) => {
+  const n = req.params.n === undefined ? 0 : Number(req.params.n);
+  const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('photo extraPhotos bakery visibleToIndividuals priorityUntil');
+  const photo = Number.isInteger(n) && n >= 0 && doc && (n === 0 ? doc.photo : doc.extraPhotos[n - 1]);
+  if (!photo?.data || !canView(doc, req.user)) return res.status(404).end();
   res.set({
-    'Content-Type': doc.photo.contentType,
+    'Content-Type': photo.contentType,
     'Cache-Control': 'private, no-store', // the ?v= query changes when the photo does
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
   });
-  res.send(doc.photo.data);
+  res.send(photo.data);
 });
 
 // GET /api/listings/:id – ended listings stay viewable (shared links) but are flagged phase: 'ended'.
 router.get('/:id', async (req, res) => {
   await sweepMissed();
-  const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('-photo.data');
+  const doc = await Listing.findOne({ _id: req.params.id, status: 'active' }).select('-photo.data -extraPhotos.data');
   if (!doc || !canView(doc, req.user)) return res.status(404).json({ error: 'Listing not found.' });
   const dto = toListingDTO(doc);
   await attachThankYouCounts([dto]); // REVIEWS FEATURE
   res.json(dto);
 });
 
-// POST /api/listings (multipart/form-data, photo in field "photo")
+// POST /api/listings (multipart/form-data, 1–5 photos in the repeated field "photo", first is the cover)
 router.post('/', requireBakery, uploadPhoto, async (req, res) => {
   const { value, errors } = parseListingInput(req.body);
-  const { photo, error: photoError } = checkPhoto(req.file);
+  const { photos, error: photoError } = checkPhotos(req.files);
   if (photoError) errors.photo = photoError;
   if (value.weightGramsPerUnit === undefined) errors.weightGramsPerUnit = 'Enter the weight in grams per unit.';
   if (Object.keys(errors).length) return res.status(422).json({ error: 'Please fix the highlighted fields.', fields: errors });
@@ -134,7 +139,8 @@ router.post('/', requireBakery, uploadPhoto, async (req, res) => {
     priorityUntil: new Date(Date.now() + priorityMinutes() * 60000),
     bakery: req.user._id,
     bakeryName: req.user.name,
-    photo,
+    photo: photos?.[0],
+    extraPhotos: photos?.slice(1),
   });
   res.status(201).json(toListingDTO(doc));
 });
@@ -151,11 +157,12 @@ router.put('/:id', requireBakery, loadOwned, uploadPhoto, async (req, res) => {
   if (!errors.quantity && value.quantity < reserved) {
     errors.quantity = `${reserved} already reserved, so quantity can't go below ${reserved}.`;
   }
-  let photo = null;
-  if (req.file) {
-    const checked = checkPhoto(req.file);
+  // New uploads replace the whole gallery; sending none keeps what is there.
+  let photos = null;
+  if (req.files?.length) {
+    const checked = checkPhotos(req.files);
     if (checked.error) errors.photo = checked.error;
-    else photo = checked.photo;
+    else photos = checked.photos;
   }
   if (Object.keys(errors).length) return res.status(422).json({ error: 'Please fix the highlighted fields.', fields: errors });
 
@@ -169,7 +176,7 @@ router.put('/:id', requireBakery, loadOwned, uploadPhoto, async (req, res) => {
       fail('Pickup times and address cannot change after food has been reserved.');
     }
     current.set({ ...value, quantityRemaining: value.quantity - allocated });
-    if (photo) current.photo = photo;
+    if (photos) { current.photo = photos[0]; current.extraPhotos = photos.slice(1); }
     await current.save({ session });
     return current;
   });
@@ -221,6 +228,7 @@ router.post('/:id/repost', requireBakery, loadOwned, async (req, res) => {
     bakery: source.bakery,
     bakeryName: source.bakeryName,
     photo: source.photo,
+    extraPhotos: source.extraPhotos,
     repostedFrom: source._id,
   });
   res.status(201).json(toListingDTO(copy));
