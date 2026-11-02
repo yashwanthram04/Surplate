@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
+import { seedTestFridges } from './fridgeFixtures.js';
 import { boot } from './helpers.js';
 
 // 1x1 transparent PNG
@@ -7,7 +8,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 let ctx, SUNRISE, CRUMB, ALEX, HOPE, ADMIN;
 before(async () => {
-  ctx = await boot(); // private in-memory MongoDB, seeded with the demo users, listings and fridges
+  ctx = await boot(); // private in-memory MongoDB, seeded with the demo users and listings
+  await seedTestFridges(); // the app no longer seeds fridges, so this file adds its own
   SUNRISE = await ctx.login('sunrise@demo.surplate.sg'); // bakery, posted at Tiong Bahru
   CRUMB = await ctx.login('crumb@demo.surplate.sg'); // bakery, posted at Toa Payoh
   ALEX = await ctx.login('alex@demo.surplate.sg'); // individual
@@ -71,7 +73,7 @@ describe('browsing the map', () => {
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.equal(body.openingHours, '24 hours');
-    assert.equal(body.openSpoiledReports, 1); // the seeded report about the sourdough loaves
+    assert.equal(body.openSpoiledReports, 1); // the fixture report about the sourdough loaves
     assert.equal((await call('/fridges/not-an-id')).status, 404);
     assert.equal((await call('/fridges/64b0000000000000000000ff')).status, 404);
   });
@@ -267,7 +269,7 @@ describe('flagging spoiled food and notifying suppliers', () => {
     assert.equal((await call('/fridges/alerts', { user: ALEX })).status, 403);
     assert.equal((await call('/fridges/alerts', { user: HOPE })).status, 403);
 
-    const report = (await alerts(SUNRISE)).find((r) => r.items === 'Sourdough loaves'); // from the demo data
+    const report = (await alerts(SUNRISE)).find((r) => r.items === 'Sourdough loaves'); // from fridgeFixtures.js
     assert.ok(report);
     const resolve = (user, json = {}) => call(`/fridges/alerts/${report.id}/resolve`, { method: 'POST', user, headers: { 'content-type': 'application/json' }, body: JSON.stringify(json) });
 

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import { now } from '../composables/useNow';
+import { useEntrance, useListMotion } from '../composables/useMotion';
 import ListingCard from '../components/ListingCard.vue';
 import ListingFilters from '../components/ListingFilters.vue';
 import ListingMap from '../components/ListingMap.vue';
@@ -19,6 +20,14 @@ const view = ref('list'); // below the lg breakpoint the page shows either the l
 // Listings whose pickup window has just closed disappear from the board right away,
 // without waiting for the next refresh.
 const visible = computed(() => items.value.filter((l) => new Date(l.pickupEnd).getTime() > now.value));
+
+// Motion: the page settles in, new cards rise one after another, and the cards that stay glide to their new
+// places. The glide watches the ids (not the array), so the once-a-second clock tick does not retrigger it.
+const page = ref(null);
+const grid = ref(null);
+useEntrance(page);
+const order = computed(() => visible.value.map((l) => l.id).join(','));
+const cardMotion = useListMotion(grid, order);
 
 let requestId = 0;
 async function load() {
@@ -62,8 +71,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="row g-4">
-    <div class="col-12">
+  <div ref="page" class="row g-4">
+    <div class="col-12" data-enter>
       <h1 class="h3 mb-1">Rescue surplus food</h1>
       <p class="text-body-secondary mb-0">Fresh leftovers from local bakeries, free to collect before the pickup window closes.</p>
       <!-- Charities-only listings are hidden from everyone except verified charities, so say so instead of leaving people guessing -->
@@ -88,7 +97,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="col-12 col-lg-7 col-xxl-8 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'map' }">
-      <ListingFilters v-model="filters" />
+      <div data-enter><ListingFilters v-model="filters" /></div>
 
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="small text-body-secondary" aria-live="polite" data-testid="result-count">
@@ -113,11 +122,12 @@ onBeforeUnmount(() => {
         <p class="text-body-secondary mb-0">Try widening your filters, or check back soon. Bakeries post throughout the day.</p>
       </div>
 
-      <div v-else class="row g-3">
-        <div v-for="l in visible" :key="l.id" class="col-12 col-md-6 col-xxl-4">
+      <!-- cards rise in one after another, and glide to their new place when a filter changes the list (see useListMotion) -->
+      <TransitionGroup v-else ref="grid" tag="div" :css="false" appear class="row g-3 position-relative" @before-enter="cardMotion.onBeforeEnter" @enter="cardMotion.onEnter" @leave="cardMotion.onLeave">
+        <div v-for="(l, i) in visible" :key="l.id" class="col-12 col-md-6 col-xxl-4" :data-index="i">
           <ListingCard :listing="l" :highlighted="hoverId === l.id" @hover="hoverId = $event" />
         </div>
-      </div>
+      </TransitionGroup>
     </div>
 
     <div class="col-12 col-lg-5 col-xxl-4 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'list' }">

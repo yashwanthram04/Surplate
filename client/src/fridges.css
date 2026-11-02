@@ -1,6 +1,7 @@
-/* Community Fridge feature. Imported by the fridge components; builds on the tokens in style.css. */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka:wght@500;600;700&display=swap');
 
-/* Status badge (list cards, detail page, popups, timeline) */
+:root { --fc-display: 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+
 .fridge-badge {
   display: inline-flex;
   align-items: center;
@@ -14,38 +15,494 @@
 .fridge-badge.lg {
   font-size: 1rem;
   padding: 0.35rem 0.9rem;
+  animation: badge-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.5);
 }
 .fridge-badge.status-stocked { background: var(--sp-green-soft); color: var(--sp-green-dark); }
 .fridge-badge.status-low { background: #fff3d6; color: #7a4a00; }
 .fridge-badge.status-empty { background: #fbe3e0; color: #8f2a1f; }
 .fridge-badge.status-unknown { background: #e9ecef; color: #495057; }
-
-/* Map pins reuse the .pin shape from style.css. Three classes beat `.pin.is-highlighted`, so the status colour stays. */
 .pin.fridge-pin.status-stocked { background: var(--sp-green); }
 .pin.fridge-pin.status-low { background: var(--sp-amber); }
 .pin.fridge-pin.status-empty { background: var(--sp-red); }
 .pin.fridge-pin.status-unknown { background: #6c757d; }
 .pin.fridge-pin.is-highlighted { box-shadow: 0 0 0 4px rgba(47, 125, 79, 0.35), 0 2px 6px rgba(0, 0, 0, 0.35); }
 .fridge-popup-badge { font-weight: 600; }
-
-/* Big three-way status picker in the update form */
 .status-choice {
   border-width: 2px;
   padding: 0.6rem 0.25rem;
   line-height: 1.2;
   font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
+.status-choice:hover { transform: translateY(-3px) rotate(-1deg); }
 .btn-check:focus-visible + .status-choice { outline: 3px solid var(--bs-focus-ring-color); }
 .status-choice.status-stocked { --bs-btn-color: var(--sp-green-dark); --bs-btn-border-color: var(--sp-green); }
 .status-choice.status-low { --bs-btn-color: #7a4a00; --bs-btn-border-color: var(--sp-amber); }
 .status-choice.status-empty { --bs-btn-color: #8f2a1f; --bs-btn-border-color: var(--sp-red); }
-.btn-check:checked + .status-choice.status-stocked { background: var(--sp-green); color: #fff; }
-.btn-check:checked + .status-choice.status-low { background: var(--sp-amber); color: #fff; }
-.btn-check:checked + .status-choice.status-empty { background: var(--sp-red); color: #fff; }
+.btn-check:checked + .status-choice.status-stocked { background: var(--sp-green); color: #fff; box-shadow: 0 8px 18px -8px var(--sp-green); }
+.btn-check:checked + .status-choice.status-low { background: var(--sp-amber); color: #fff; box-shadow: 0 8px 18px -8px var(--sp-amber); }
+.btn-check:checked + .status-choice.status-empty { background: var(--sp-red); color: #fff; box-shadow: 0 8px 18px -8px var(--sp-red); }
 
-/* Update history */
 .update-list { list-style: none; margin: 0; padding: 0; }
 .update-item { padding: 0.9rem 0; border-top: 1px solid #e8e4da; }
 .update-item:first-child { border-top: 0; }
 .update-photo { max-height: 180px; max-width: 100%; border-radius: 0.6rem; object-fit: cover; }
 .fridge-note { font-style: italic; color: #4a4a4a; }
+
+.status-stocked { --fc-accent: var(--sp-green); }
+.status-low { --fc-accent: var(--sp-amber); }
+.status-empty { --fc-accent: var(--sp-red); }
+.status-unknown { --fc-accent: #adb5bd; }
+
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+.lenis.lenis-smooth iframe { pointer-events: none; }
+
+.fridge-backdrop { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.bd-blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; }
+.bd-blob.b1 { width: 42vw; height: 42vw; left: -10vw; top: -8vw; background: #cfe9d8; }
+.bd-blob.b2 { width: 34vw; height: 34vw; right: -8vw; top: 30vh; background: #ffe3a3; }
+.bd-blob.b3 { width: 38vw; height: 38vw; left: 25vw; bottom: -18vw; background: #d7efe0; }
+.bd-bit { position: absolute; top: 0; opacity: 0.2; user-select: none; will-change: transform; }
+
+html.fridge-route { overflow-x: clip; }
+.fridge-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  overflow: clip; /* unlike hidden, clip can't be scrolled by focus/scrollIntoView, so tabbing to a map dot never shifts the banner */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'stage' 'copy';
+  align-items: center;
+  gap: 0.3rem 2rem;
+  padding: 1.3rem 1.3rem 1.8rem;
+  border-radius: 2rem;
+  color: #fff;
+  background: linear-gradient(135deg, #3c9c63 0%, var(--sp-green) 45%, #1e5a39 100%);
+  box-shadow: 0 26px 48px -26px rgba(38, 100, 64, 0.75), inset 0 -7px 0 rgba(0, 0, 0, 0.09);
+}
+/* frosted glass: fine white grain over the green */
+.fridge-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .5 0 0 0 -.22'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  pointer-events: none;
+}
+
+/* ---- The banner as a fridge door: frost at the edges, drifting cold mist, a rubber seal and a chrome handle ---- */
+.hero-frost {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  opacity: 0.45;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 90% at 0% 0%, rgba(234, 247, 255, 0.6), rgba(234, 247, 255, 0) 45%),
+    radial-gradient(70% 90% at 100% 100%, rgba(234, 247, 255, 0.5), rgba(234, 247, 255, 0) 42%),
+    radial-gradient(50% 70% at 100% 0%, rgba(234, 247, 255, 0.35), rgba(234, 247, 255, 0) 38%),
+    radial-gradient(50% 70% at 0% 100%, rgba(234, 247, 255, 0.35), rgba(234, 247, 255, 0) 38%);
+}
+.hero-mist { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; filter: blur(28px); background: radial-gradient(circle, rgba(226, 245, 255, 0.3), rgba(226, 245, 255, 0) 70%); }
+.hero-mist.m1 { width: 40%; aspect-ratio: 1.7; left: -8%; bottom: -38%; animation: mist-drift 19s ease-in-out infinite alternate; }
+.hero-mist.m2 { width: 32%; aspect-ratio: 1.5; left: 36%; top: -40%; animation: mist-drift 23s ease-in-out -6s infinite alternate-reverse; }
+.hero-mist.m3 { width: 28%; aspect-ratio: 1.5; right: 16%; bottom: -34%; animation: mist-drift 16s ease-in-out -3s infinite alternate; }
+.hero-seal { position: absolute; inset: 9px; z-index: 0; border-radius: calc(2rem - 9px); border: 3px solid rgba(255, 255, 255, 0.13); box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.1); pointer-events: none; }
+.fridge-hero.is-mini .hero-seal { inset: 7px; border-width: 2px; border-radius: calc(2rem - 7px); }
+@property --glint { syntax: '<percentage>'; inherits: false; initial-value: -60%; }
+.hero-handle {
+  --glint: -60%;
+  position: absolute;
+  z-index: 3;
+  right: 13px;
+  top: 26%;
+  width: 11px;
+  height: 48%;
+  border-radius: 8px;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0) calc(var(--glint) - 16%), rgba(255, 255, 255, 0.95) var(--glint), rgba(255, 255, 255, 0) calc(var(--glint) + 16%)),
+    linear-gradient(90deg, #8ea597, #eef5f1 42%, #c6d5cc 62%, #7c9587);
+  box-shadow: -3px 5px 10px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  animation: handle-glint 8s ease-in-out 3s infinite;
+}
+.fridge-hero.is-mini .hero-handle { right: 10px; top: 22%; height: 56%; width: 9px; }
+
+/* ---- Singapore mini-map in the banner (wide screens only) ---- */
+.hero-map-wrap { grid-area: map; display: none; position: relative; z-index: 2; min-width: 0; }
+@media (min-width: 1200px) {
+  .fridge-hero.has-map { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'copy map stage'; }
+  .fridge-hero.has-map .hero-map-wrap { display: block; }
+}
+.hero-map { position: relative; width: 100%; max-width: 560px; margin-inline: auto; }
+.hero-map svg { display: block; width: 100%; height: auto; overflow: visible; }
+.hm-land { fill: rgba(255, 255, 255, 0.1); stroke: rgba(230, 246, 255, 0.6); stroke-width: 1.2; stroke-dasharray: 3 3; stroke-linejoin: round; }
+.hm-dot { cursor: pointer; outline: none; }
+.hm-dot.status-stocked { --hm: #7ef0ad; }
+.hm-dot.status-low { --hm: #ffcf4d; }
+.hm-dot.status-empty { --hm: #ff8a7a; }
+.hm-dot.status-unknown { --hm: #d3dbe0; }
+.hm-core { fill: var(--hm); stroke: #fff; stroke-width: 1.6; transform-box: fill-box; transform-origin: center; transition: transform 0.2s cubic-bezier(0.3, 1.7, 0.5, 1); }
+.hm-dot:hover .hm-core, .hm-dot:focus-visible .hm-core { transform: scale(1.55); }
+.hm-dot:focus-visible .hm-core { stroke: #ffd66b; stroke-width: 2.4; }
+.hm-ping { fill: none; stroke: var(--hm); stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: hm-ping 2.8s ease-out infinite; }
+.hm-tip {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 12px));
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.6rem;
+  background: #fff;
+  color: #1f3a2b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.45);
+}
+.hm-tip span { display: block; font-size: 0.72rem; font-weight: 400; color: #5b6b62; }
+.fridge-hero .hm-caption { margin: 0.25rem 0 0; max-width: none; text-align: center; font-size: 0.78rem; color: rgba(255, 255, 255, 0.72); }
+
+/* ---- Slim bar the banner shrinks into once it scrolls away (FridgeStickyBar) ---- */
+.fridge-sticky-bar { position: fixed !important; left: 0; right: 0; z-index: 1010; width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; visibility: hidden; pointer-events: none; }
+.fsb-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem 0.4rem 0.8rem;
+  border-radius: 99px;
+  color: #fff;
+  background: linear-gradient(135deg, #3c9c63 0%, var(--sp-green) 50%, #1e5a39 100%);
+  box-shadow: 0 14px 28px -16px rgba(38, 100, 64, 0.85), inset 0 0 0 2px rgba(255, 255, 255, 0.14);
+}
+.fsb-title { font-family: var(--fc-display); font-size: 1.15rem; font-weight: 700; line-height: 1; }
+.fsb-stats { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
+.fsb-stat { display: inline-flex; align-items: baseline; gap: 0.35rem; padding: 0.22rem 0.75rem; border-radius: 99px; background: rgba(255, 255, 255, 0.16); font-size: 0.8rem; }
+.fsb-stat strong { font-family: var(--fc-display); font-size: 1.05rem; line-height: 1; font-variant-numeric: tabular-nums; }
+@media (max-width: 575.98px) {
+  .fsb-title { font-size: 1rem; }
+  .fsb-stat:first-child { display: none; }
+}
+.map-sticky.fridge-map-wrap { transition: top 0.3s ease, height 0.3s ease; }
+html.fridge-bar-on .map-sticky.fridge-map-wrap { top: 8.6rem; height: calc(100vh - 10.1rem); }
+.fridge-hero.is-mini { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'copy stage'; gap: 1rem; padding: 1.1rem 1rem 1.3rem 1.4rem; }
+@media (min-width: 768px) {
+  .fridge-hero { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'copy stage'; padding: 2rem 2.2rem 2.2rem 3rem; }
+  .fridge-hero.is-mini { padding: 1.2rem 2rem 1.3rem 2.4rem; }
+}
+.hero-copy { grid-area: copy; position: relative; z-index: 2; min-width: 0; }
+.fridge-title-xl {
+  margin: 0 0 0.6rem;
+  font-family: var(--fc-display);
+  font-size: clamp(2.5rem, 6vw, 4.4rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 5px 0 rgba(0, 0, 0, 0.14);
+}
+.fridge-hero.is-mini .fridge-title-xl { font-size: clamp(1.8rem, 4.2vw, 2.8rem); margin-bottom: 0.35rem; }
+.fridge-title-xl .word { display: inline-block; white-space: nowrap; margin-right: 0.24em; }
+.fridge-title-xl .ch, .fridge-title-xl .ch-in { display: inline-block; }
+.fridge-title-xl .ch-in { cursor: default; }
+.fridge-hero p { color: rgba(255, 255, 255, 0.92); max-width: 46ch; font-size: 1.05rem; }
+.fridge-hero.is-mini p { font-size: 0.95rem; }
+
+.hero-stage-wrap { grid-area: stage; justify-self: center; position: relative; z-index: 1; }
+.hero-stage { --stage: 200px; position: relative; width: var(--stage); aspect-ratio: 1; display: grid; place-items: center; }
+.fridge-hero.is-mini .hero-stage { --stage: 108px; }
+@media (min-width: 768px) {
+  .hero-stage { --stage: 290px; }
+  .fridge-hero.is-mini .hero-stage { --stage: 170px; }
+}
+.hero-stage::before { content: ''; position: absolute; inset: 6%; border-radius: 50%; background: radial-gradient(circle, rgba(255, 214, 107, 0.5), rgba(255, 214, 107, 0) 68%); }
+.hero-rays {
+  position: absolute;
+  inset: -16%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 214, 107, 0.24) 0deg 8deg, transparent 8deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 22%, transparent 70%);
+  mask: radial-gradient(circle, #000 22%, transparent 70%);
+}
+.hero-orbit { position: absolute; inset: 0; }
+.orb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font-size: calc(var(--stage) * 0.12);
+  line-height: 1;
+  transform: translate(-50%, -50%) rotate(var(--a)) translateX(calc(var(--stage) * 0.44)) rotate(calc(var(--a) * -1));
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.25));
+}
+.orb-in { display: inline-block; }
+.hero-mascot-pop { position: relative; z-index: 1; width: 56%; line-height: 0; cursor: pointer; }
+.hero-mascot-pop .mc { width: 100% !important; }
+.hero-spark { position: absolute; z-index: 0; color: #e6f6ff; text-shadow: 0 0 8px rgba(190, 230, 255, 0.9); line-height: 1; pointer-events: none; user-select: none; opacity: 0.85; } /* ice glints */
+.hero-spark.s1 { top: 9%; left: 44%; font-size: 1.5rem; }
+.hero-spark.s2 { top: 74%; left: 58%; font-size: 0.9rem; }
+.hero-spark.s3 { top: 16%; right: 3%; font-size: 1.1rem; }
+.hero-spark.s4 { bottom: 9%; right: 30%; font-size: 1.3rem; }
+.hero-spark.s5 { top: 46%; left: 2%; font-size: 0.8rem; }
+.hero-spark.s6 { bottom: 6%; left: 38%; font-size: 1rem; }
+.fridge-hero .btn-sticker {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.7rem 1.4rem;
+  border: 0;
+  border-radius: 99px;
+  background: #ffd66b;
+  color: #4a3200;
+  font-family: var(--fc-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  box-shadow: 0 6px 0 #d9a21f, 0 16px 22px -10px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.15s, background 0.15s;
+}
+.fridge-hero .btn-sticker:hover { background: #ffe08d; color: #4a3200; }
+.fridge-hero .btn-sticker:active { box-shadow: 0 2px 0 #d9a21f; }
+.hero-stats { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.3rem; }
+.hero-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(6px);
+}
+.hero-stat strong { font-family: var(--fc-display); font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.hero-stat span { font-size: 0.8rem; opacity: 0.92; }
+
+/* ---- Fridge magnet strip under the banner (FridgeMagnets): a band of white fridge door with magnets on it ---- */
+.mg-board {
+  --mg-size: clamp(1.55rem, 2.5vw, 2.4rem);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  padding: 1.1rem 1.5rem 1.35rem;
+  border-radius: 1.6rem;
+  background: linear-gradient(180deg, #fdfefd 0%, #f0f5f2 100%);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -3px 0 rgba(38, 100, 64, 0.06), 0 16px 30px -22px rgba(40, 60, 40, 0.45);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.mg-word { display: inline-flex; gap: 0.1em; white-space: nowrap; }
+.mg { position: relative; display: inline-block; rotate: var(--r, 0deg); translate: 0 var(--dy, 0px); cursor: grab; touch-action: pan-y; }
+.mg:hover:not(.is-dragging) { animation: mg-wobble 0.6s ease-in-out; }
+.mg.is-dragging { z-index: 5; cursor: grabbing; }
+/* chunky plastic letters: stacked darker copies underneath give them thickness */
+.mg-letter {
+  font-family: var(--fc-display);
+  font-size: var(--mg-size);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--c);
+  text-shadow:
+    0 1px 0 color-mix(in srgb, var(--c) 82%, #000),
+    0 2px 0 color-mix(in srgb, var(--c) 72%, #000),
+    0 3px 0 color-mix(in srgb, var(--c) 62%, #000),
+    0 7px 8px rgba(0, 0, 0, 0.22);
+}
+.mg-food { font-size: calc(var(--mg-size) * 1.05); line-height: 1; filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.25)); }
+.mg-polaroid { display: inline-flex; flex-direction: column; width: 4.4rem; padding: 0.3rem 0.3rem 0.15rem; border-radius: 3px; background: #fff; box-shadow: 0 6px 12px -4px rgba(0, 0, 0, 0.3); }
+.mg-polaroid::before { content: ''; position: absolute; top: -6px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff9a9a, #d62828 70%); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.35); }
+.mg-photo { display: grid; place-items: center; aspect-ratio: 1; background: linear-gradient(160deg, #d6eeff, #9fd0ee); }
+.mg-caption { font-family: 'Caveat', 'Segoe Print', 'Bradley Hand', cursive; font-size: 1rem; line-height: 1.25; text-align: center; color: #2f3a45; }
+@media (max-width: 575.98px) {
+  .mg-hide-sm { display: none !important; }
+  .mg-board { gap: 0.4rem 1rem; padding: 1rem; }
+}
+
+.fridge-filters { border: 0 !important; border-radius: 1.5rem !important; box-shadow: 0 16px 32px -20px rgba(40, 60, 40, 0.5); }
+.fridge-filters .form-control, .fridge-filters .form-select { border-radius: 0.9rem; border-width: 2px; }
+.fridge-filters .chip { padding: 0.3rem 0.9rem; border-width: 2px; font-weight: 600; transition: transform 0.15s; }
+.fridge-filters .chip:hover { transform: translateY(-2px) rotate(-1.5deg); }
+.fridge-filters .chip.chip-stocked { --bs-btn-color: var(--sp-green-dark); --bs-btn-border-color: var(--sp-green); --bs-btn-hover-bg: var(--sp-green-soft); --bs-btn-hover-color: var(--sp-green-dark); --bs-btn-hover-border-color: var(--sp-green); }
+.fridge-filters .chip.chip-low { --bs-btn-color: #7a4a00; --bs-btn-border-color: var(--sp-amber); --bs-btn-hover-bg: #fff3d6; --bs-btn-hover-color: #7a4a00; --bs-btn-hover-border-color: var(--sp-amber); }
+.fridge-filters .chip.chip-empty { --bs-btn-color: #8f2a1f; --bs-btn-border-color: var(--sp-red); --bs-btn-hover-bg: #fbe3e0; --bs-btn-hover-color: #8f2a1f; --bs-btn-hover-border-color: var(--sp-red); }
+.fridge-filters .chip-check:checked + .chip.chip-low { background: var(--sp-amber); border-color: var(--sp-amber); color: #fff; }
+.fridge-filters .chip-check:checked + .chip.chip-empty { background: var(--sp-red); border-color: var(--sp-red); color: #fff; }
+.fridge-filters .chip-check:checked + .chip.chip-unknown { background: #6c757d; border-color: #6c757d; color: #fff; }
+
+.listing-card.fridge-card { border: 0; border-radius: 1.5rem; box-shadow: 0 12px 26px -16px rgba(40, 60, 40, 0.55); transition: box-shadow 0.3s; transform-style: preserve-3d; }
+.listing-card.fridge-card:hover, .listing-card.fridge-card.is-highlighted { box-shadow: 0 30px 44px -22px rgba(40, 60, 40, 0.6); transform: none; }
+.fridge-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 5px; z-index: 2; background: var(--fc-accent); pointer-events: none; }
+.fridge-card-media { position: relative; overflow: hidden; }
+.listing-card.fridge-card .photo, .listing-card.fridge-card .photo-placeholder { aspect-ratio: 16 / 10; }
+.fridge-card .photo { transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.fridge-card:hover .photo { transform: scale(1.09) rotate(0.6deg); }
+.fridge-card .photo-placeholder { display: grid; place-items: center; background: linear-gradient(160deg, var(--sp-green-soft), #fff3d6 120%); }
+.fridge-card h2 { font-family: var(--fc-display); font-size: 1.18rem; font-weight: 600; }
+.card-status-chip { position: absolute; top: 0.85rem; left: 0.85rem; z-index: 3; padding: 0.32rem 0.85rem; font-size: 0.88rem; border: 2px solid #fff; box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.45); }
+.live-dot { position: relative; display: inline-block; width: 8px; height: 8px; margin-right: 0.4rem; border-radius: 50%; background: var(--sp-green); }
+.live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--sp-green); animation: live-ping 1.8s ease-out infinite; }
+
+.fridge-map-wrap .map-box { border: 0; border-radius: 1.5rem; box-shadow: 0 22px 44px -24px rgba(38, 100, 64, 0.6); }
+.pin.fridge-pin { position: relative; }
+.pin.fridge-pin.pin-in { animation: pin-drop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.3) backwards; animation-delay: var(--d, 0ms); }
+.pin.fridge-pin.status-stocked::after { content: ''; position: absolute; inset: -2px; border-radius: inherit; animation: pin-pulse 2.4s ease-out infinite; }
+.fridge-popup .leaflet-popup-content-wrapper { border-radius: 1rem; box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.4); }
+.fridge-popup .leaflet-popup-content { margin: 0.8rem 1rem; }
+.fridge-popup-badge.status-stocked { color: var(--sp-green-dark); }
+.fridge-popup-badge.status-low { color: #7a4a00; }
+.fridge-popup-badge.status-empty { color: #8f2a1f; }
+
+.fridge-media { position: relative; overflow: hidden; aspect-ratio: 3 / 2; border-radius: 1.6rem; box-shadow: 0 22px 42px -24px rgba(40, 60, 40, 0.65); background: var(--sp-green-soft); }
+.fridge-media img { width: 100%; height: 100%; object-fit: cover; display: block; will-change: transform; }
+.fridge-panel { border: 0 !important; border-radius: 1.6rem !important; box-shadow: 0 18px 36px -22px rgba(40, 60, 40, 0.55); }
+.fridge-panel.status-panel { position: relative; background: linear-gradient(180deg, color-mix(in srgb, var(--fc-accent) 14%, #fff), #fff 58%) !important; border-top: 5px solid var(--fc-accent) !important; }
+.fridge-title { font-family: var(--fc-display); font-weight: 700; padding-right: 6.2rem; }
+.mc.status-mascot { position: absolute; top: -28px; right: 14px; z-index: 2; }
+
+.update-list.timeline .update-item { position: relative; padding-left: 1.7rem; border-top: 0; }
+.update-list.timeline .update-item::before { content: ''; position: absolute; left: 0.1rem; top: 1.2rem; width: 0.85rem; height: 0.85rem; border-radius: 50%; background: var(--fc-accent); box-shadow: 0 0 0 4px #fff, 0 0 0 5px var(--fc-accent); }
+.update-list.timeline .update-item::after { content: ''; position: absolute; left: calc(0.1rem + 0.425rem - 1px); top: 2.4rem; bottom: -0.3rem; width: 2px; background: #e3ded2; }
+.update-list.timeline .update-item:last-child::after { display: none; }
+
+/* Detail page: a small mascot floats beside each history item (float uses translate/rotate, so GSAP's spin on .mc never fights it) */
+.update-list.timeline .update-item { padding-right: 4.4rem; }
+.update-mascot { position: absolute; top: 50%; right: 0.5rem; margin-top: -1.9rem; padding: 0; border: 0; background: none; line-height: 0; cursor: pointer; animation: mascot-float 3.6s ease-in-out var(--float-delay, 0s) infinite; transition: scale 0.2s ease; }
+.update-mascot:hover { scale: 1.12; }
+
+/* Detail page: the timeline draws itself (vTimeline adds .is-drawn; without it the static segments above show) */
+.timeline-wrap { position: relative; }
+.timeline-rail { display: none; }
+.timeline-wrap.is-drawn .timeline-rail { display: block; position: absolute; left: calc(0.1rem + 0.425rem - 1.5px); width: 3px; border-radius: 3px; background: linear-gradient(var(--sp-green), color-mix(in srgb, var(--sp-green) 30%, #e3ded2)); transform-origin: top; transform: scaleY(0); z-index: 0; }
+.timeline-wrap.is-drawn .update-item::before { z-index: 1; transform: scale(0); transition: transform 0.45s cubic-bezier(0.3, 1.7, 0.5, 1); }
+.timeline-wrap.is-drawn .update-item.dot-on::before { transform: scale(1); }
+/* the per-item segment becomes the dot's ripple ring */
+.timeline-wrap.is-drawn .update-item::after,
+.timeline-wrap.is-drawn .update-item:last-child::after { display: block; left: 0.1rem; top: 1.2rem; bottom: auto; width: 0.85rem; height: 0.85rem; border-radius: 50%; background: none; border: 2px solid var(--fc-accent); opacity: 0; }
+.timeline-wrap.is-drawn .update-item.dot-on::after { animation: dot-ripple 0.9s ease-out; }
+.timeline-wrap.is-drawn .update-item > * { opacity: 0; transform: translateX(-12px); transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.timeline-wrap.is-drawn .update-item.dot-on > * { opacity: 1; transform: none; }
+
+/* Detail page: the photo opens like a fridge door (vDoor shows these, swings the door and fades the light) */
+.fridge-door, .fridge-door-glow { position: absolute; inset: 0; border-radius: inherit; visibility: hidden; opacity: 0; pointer-events: none; }
+.fridge-door-glow { z-index: 1; background: radial-gradient(ellipse 75% 95% at 20% 50%, rgba(238, 248, 255, 0.95), rgba(196, 228, 255, 0.55) 45%, rgba(196, 228, 255, 0) 80%); }
+.fridge-door { z-index: 2; background: linear-gradient(140deg, #fbfdfb 0%, #e6f1ea 55%, #d3e6da 100%); box-shadow: inset 0 0 0 1px rgba(38, 100, 64, 0.12), inset -24px 0 36px -24px rgba(38, 100, 64, 0.3); backface-visibility: hidden; }
+.fridge-door-handle { position: absolute; right: 7%; top: 32%; width: 12px; height: 36%; border-radius: 8px; background: linear-gradient(90deg, #b5cdbf, #eef5f0 50%, #a9c3b4); box-shadow: 0 6px 12px -6px rgba(38, 100, 64, 0.55); }
+
+/* Detail page: status card glare (vGlare sets --gx/--gy and .is-glaring) */
+.panel-glare { position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity 0.35s ease;
+  background: radial-gradient(circle at var(--gx, 50%) var(--gy, 0%), rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 42%),
+    radial-gradient(circle at calc(100% - var(--gx, 50%)) calc(100% - var(--gy, 0%)), rgba(30, 60, 40, 0.07), rgba(30, 60, 40, 0) 60%); }
+.status-panel.is-glaring > .panel-glare { opacity: 1; }
+
+/* Detail page: the status card's mood. Content sits above the mood and glare layers. */
+.status-panel > :not(.panel-mood):not(.panel-glare):not(.mc) { position: relative; z-index: 1; }
+.panel-mood { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+/* stocked: a frosty shimmer sweeps across now and then */
+.status-panel.status-stocked .panel-mood::before { content: ''; position: absolute; top: -20%; bottom: -20%; left: -40%; width: 35%; background: linear-gradient(100deg, rgba(210, 238, 255, 0), rgba(210, 238, 255, 0.75) 50%, rgba(210, 238, 255, 0)); transform: skewX(-18deg); animation: frost-sweep 6s ease-in-out 1.8s infinite; }
+/* running low: the badge pulses amber */
+.status-panel.status-low .fridge-badge.lg { animation: badge-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.5), low-pulse 2.4s ease-out 0.8s infinite; }
+/* empty: the mascot shivers and frost flakes drift down */
+.status-panel .mc.is-empty .mc-svg { animation: mc-shiver 5s ease-in-out infinite; }
+.panel-mood .flake { position: absolute; top: -1.4rem; line-height: 1; color: #93cdf2; opacity: 0; animation: flake-fall 8s linear infinite; }
+.panel-mood .fl1 { left: 6%; font-size: 0.8rem; }
+.panel-mood .fl2 { left: 21%; font-size: 1.1rem; animation-delay: 2.6s; animation-duration: 9s; }
+.panel-mood .fl3 { left: 37%; font-size: 0.7rem; animation-delay: 5.1s; }
+.panel-mood .fl4 { left: 52%; font-size: 0.95rem; animation-delay: 1.2s; animation-duration: 10s; }
+.panel-mood .fl5 { left: 66%; font-size: 0.75rem; animation-delay: 3.8s; }
+.panel-mood .fl6 { left: 80%; font-size: 1rem; animation-delay: 6.4s; animation-duration: 9.5s; }
+.panel-mood .fl7 { left: 92%; font-size: 0.7rem; animation-delay: 0.5s; }
+
+
+.fridge-form-page { padding-bottom: 8rem; }
+.fridge-form-card { border: 0 !important; border-radius: 1.5rem !important; box-shadow: 0 16px 32px -22px rgba(40, 60, 40, 0.5); }
+.alert-card { border: 0 !important; border-radius: 1.5rem !important; box-shadow: 0 16px 32px -22px rgba(40, 60, 40, 0.5); border-left: 6px solid var(--sp-amber) !important; }
+.alert-card.is-resolved { border-left-color: var(--sp-green) !important; }
+
+.mc { position: relative; display: inline-block; line-height: 0; }
+.mc-svg { display: block; width: 100%; height: auto; overflow: visible; transform-origin: 50% 100%; }
+.mc.is-stocked { --mc-fill: #f2fbf5; --mc-line: #266440; }
+.mc.is-low { --mc-fill: #fff8e6; --mc-line: #a86a00; }
+.mc.is-empty { --mc-fill: #fdf1ef; --mc-line: #a63a2c; }
+.mc.is-unknown { --mc-fill: #f4f5f6; --mc-line: #6c757d; }
+.mc-body { fill: var(--mc-fill); stroke: var(--mc-line); }
+.mc-line { stroke: var(--mc-line); }
+.mc-solid { fill: var(--mc-line); }
+.mc-shadow { fill: rgba(0, 0, 0, 0.13); }
+.mc-face { fill: none; stroke: #2b3a30; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
+.mc-mouth { fill: #ff8fa3; stroke: #2b3a30; stroke-width: 3.2; stroke-linejoin: round; }
+.mc-eye { fill: #2b3a30; }
+.mc-cheek { fill: #ffb3c1; opacity: 0.75; }
+.mc-drop, .mc-tear { fill: #8fd3ff; stroke: #4aa9e0; stroke-width: 1.5; }
+.mc-zzz { fill: #8a949d; font-family: var(--fc-display); animation: mc-zzz 2.8s ease-in-out infinite; }
+.mc-zzz.z2 { animation-delay: 0.9s; }
+.mc-eyes { transform-box: fill-box; transform-origin: center; animation: mc-blink 4.6s infinite; }
+.mc.is-stocked .mc-svg { animation: mc-hop 2.8s ease-in-out infinite; }
+.mc.is-low .mc-svg { animation: mc-sway 3.4s ease-in-out infinite; }
+.mc.is-empty .mc-svg { animation: mc-droop 4.2s ease-in-out infinite; }
+.mc.is-unknown .mc-svg { animation: mc-float 4s ease-in-out infinite; }
+.mc-food { position: absolute; line-height: 1; font-size: calc(var(--mc-size) * 0.24); animation: mc-bob 2.6s ease-in-out infinite; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.2)); }
+.mc-food.mf1 { top: -4%; left: -16%; }
+.mc-food.mf2 { top: 26%; right: -24%; animation-delay: 0.7s; }
+.mc-food.mf3 { bottom: 18%; left: -22%; animation-delay: 1.4s; }
+
+.fx-layer { position: fixed; inset: 0; z-index: 2000; pointer-events: none; overflow: hidden; }
+.fx-bit { position: absolute; font-size: 1.5rem; line-height: 1; will-change: transform; }
+
+@keyframes badge-pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes pin-drop {
+  from { transform: translateY(-34px) rotate(-45deg) scale(0.3); opacity: 0; }
+  to { transform: rotate(-45deg) scale(1); opacity: 1; }
+}
+@keyframes pin-pulse { 0% { box-shadow: 0 0 0 0 rgba(47, 125, 79, 0.55); } 100% { box-shadow: 0 0 0 16px rgba(47, 125, 79, 0); } }
+@keyframes live-ping { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(3); opacity: 0; } }
+@keyframes mc-hop { 0%, 55%, 100% { transform: translateY(0) scale(1, 1); } 62% { transform: translateY(0) scale(1.06, 0.92); } 76% { transform: translateY(-12px) scale(0.96, 1.05); } 90% { transform: translateY(0) scale(1.04, 0.95); } }
+@keyframes mc-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes mc-droop { 0%, 100% { transform: rotate(-2.5deg) scaleY(1); } 50% { transform: rotate(-4deg) scaleY(0.97); } }
+@keyframes mc-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes mc-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes mc-bob { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-8px) rotate(6deg); } }
+@keyframes mc-zzz { 0%, 100% { opacity: 0.2; transform: translateY(2px); } 50% { opacity: 1; transform: translateY(-4px); } }
+@keyframes mc-shiver {
+  0%, 76%, 100% { transform: rotate(-3deg); }
+  79% { transform: translateX(-2px) rotate(-4.5deg); }
+  82% { transform: translateX(2px) rotate(-1.5deg); }
+  85% { transform: translateX(-2px) rotate(-4.5deg); }
+  88% { transform: translateX(1.5px) rotate(-2deg); }
+  91% { transform: translateX(-1px) rotate(-3.5deg); }
+}
+@keyframes mascot-float {
+  0%, 100% { translate: 0 0; rotate: -4deg; }
+  33% { translate: -4px -7px; rotate: 3deg; }
+  66% { translate: 3px -3px; rotate: -1deg; }
+}
+@keyframes mg-wobble {
+  0%, 100% { rotate: var(--r, 0deg); }
+  25% { rotate: calc(var(--r, 0deg) + 10deg); }
+  55% { rotate: calc(var(--r, 0deg) - 7deg); }
+  80% { rotate: calc(var(--r, 0deg) + 3deg); }
+}
+@keyframes mist-drift { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(16%, -14%) scale(1.18); } }
+@keyframes handle-glint { 0%, 82% { --glint: -60%; } 100% { --glint: 160%; } }
+@keyframes hm-ping { 0% { transform: scale(1); opacity: 0.9; } 70%, 100% { transform: scale(3.4); opacity: 0; } }
+@keyframes dot-ripple { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(3.2); opacity: 0; } }
+@keyframes frost-sweep { 0% { transform: skewX(-18deg) translateX(0); } 40%, 100% { transform: skewX(-18deg) translateX(560%); } }
+@keyframes low-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sp-amber) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--sp-amber) 0%, transparent); } }
+@keyframes flake-fall { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 0.65; } 80% { opacity: 0.45; } 100% { transform: translateY(28rem) rotate(220deg); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fridge-badge.lg, .pin.fridge-pin.pin-in, .pin.fridge-pin.status-stocked::after, .live-dot::after,
+  .mc-svg, .mc-eyes, .mc-food, .mc-zzz,
+  .status-panel.status-low .fridge-badge.lg, .status-panel .mc.is-empty .mc-svg, .status-panel.status-stocked .panel-mood::before, .panel-mood .flake,
+  .hero-mist, .hero-handle, .hm-ping, .mg, .update-mascot { animation: none !important; }
+  .mg { cursor: default; }
+  .hm-ping { display: none; }
+  .map-sticky.fridge-map-wrap { transition: none; }
+  .panel-mood { display: none; }
+  .listing-card.fridge-card, .fridge-card .photo, .status-choice, .fridge-filters .chip { transition: none !important; }
+}

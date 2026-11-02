@@ -10,3 +10,8 @@ dist/
 test-results/
 playwright-report/
 blob-report/
+
+# AI agent skills (local tooling, not part of the app)
+.agents/
+.claude/
+skills-lock.json

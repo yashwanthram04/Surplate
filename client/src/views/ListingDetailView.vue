@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage } from '../api';
+import { useEntrance } from '../composables/useMotion';
 import { now } from '../composables/useNow';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import CountdownRing from '../components/CountdownRing.vue';
@@ -46,6 +47,11 @@ async function load() {
 }
 watch(() => props.id, load, { immediate: true });
 
+// The page settles in once the listing has arrived: photo first, then the details, then the map.
+const page = ref(null);
+const { play } = useEntrance(page);
+watch(listing, () => nextTick(play));
+
 async function remove() {
   removing.value = true;
   removeError.value = '';
@@ -60,7 +66,7 @@ async function remove() {
 </script>
 
 <template>
-  <div class="mx-auto" style="max-width: 1100px">
+  <div ref="page" class="mx-auto" style="max-width: 1100px">
     <RouterLink to="/browse" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> All listings</RouterLink>
 
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
@@ -82,18 +88,18 @@ async function remove() {
 
       <div class="row g-4 mt-1">
         <div class="col-12 col-lg-7">
-          <div v-if="listing.photoUrl" class="rounded-4 border overflow-hidden">
+          <div v-if="listing.photoUrl" class="rounded-4 border overflow-hidden" data-enter>
             <PhotoCarousel :urls="listing.photoUrls?.length ? listing.photoUrls : [listing.photoUrl]" :alt="`Photo of ${listing.itemName}`" />
           </div>
-          <div v-else class="photo-placeholder rounded-4" aria-hidden="true">🥖</div>
-          <div v-if="listing.description" class="mt-3">
+          <div v-else class="photo-placeholder rounded-4" aria-hidden="true" data-enter>🥖</div>
+          <div v-if="listing.description" class="mt-3" data-enter>
             <h2 class="h6">About this listing</h2>
             <p class="mb-0" style="white-space: pre-line">{{ listing.description }}</p>
           </div>
         </div>
 
         <div class="col-12 col-lg-5">
-          <div class="bg-white border rounded-4 p-4">
+          <div class="bg-white border rounded-4 p-4" data-enter>
             <div class="d-flex justify-content-between align-items-start gap-3">
               <div>
                 <h1 class="h3 mb-1" data-testid="listing-title">{{ listing.itemName }}</h1>
@@ -158,7 +164,7 @@ async function remove() {
           </div>
         </div>
 
-        <div class="col-12">
+        <div class="col-12" data-enter>
           <h2 class="h6">Pickup location</h2>
           <div style="height: 320px"><ListingMap :listings="[listing]" :linkable="false" /></div>
         </div>
