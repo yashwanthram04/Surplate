@@ -4,11 +4,6 @@ import { connectDb } from './db.js';
 import Listing from './models/Listing.js';
 import User from './models/User.js';
 import Reservation from './models/Reservation.js';
-// >>> FRIDGE FEATURE: ADD these three imports (start): seed:reset clears fridge data
-import Fridge from './models/Fridge.js';
-import FridgeUpdate from './models/FridgeUpdate.js';
-import SpoiledReport from './models/SpoiledReport.js';
-// <<< FRIDGE FEATURE (end)
 // >>> REVIEWS FEATURE: ADD these three imports (start)
 import Review from './models/Review.js';
 import RecipientRating from './models/RecipientRating.js';
@@ -148,9 +143,8 @@ export async function seedDemoReviews(history) {
 export async function seedDemoData({ reset = false } = {}) {
   if (reset) {
     await Promise.all([Reservation.deleteMany({}), Listing.deleteMany({}), User.deleteMany({}),
-      // >>> FRIDGE FEATURE: ADD these three clears inside the Promise.all (start)
-      Fridge.deleteMany({}), FridgeUpdate.deleteMany({}), SpoiledReport.deleteMany({}),
-      // <<< FRIDGE FEATURE (end)
+      // FRIDGE FEATURE: fridges, fridge updates and spoiled reports are deliberately NOT cleared here.
+      // They are real community data with no demo copy to restore, so a reset must leave them alone.
       // >>> REVIEWS FEATURE: ADD this line inside the Promise.all (start)
       Review.deleteMany({}), RecipientRating.deleteMany({}), Appeal.deleteMany({}),
       // <<< REVIEWS FEATURE (end)
