@@ -274,7 +274,7 @@ body {
 }
 
 .photo-preview {
-  max-height: 220px;
+  max-height: 120px;
   max-width: 100%;
   border-radius: 0.6rem;
   object-fit: cover;

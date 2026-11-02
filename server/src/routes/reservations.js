@@ -24,15 +24,39 @@ router.param('id', (req, res, next, id) => {
   next();
 });
 
+// ?status= narrows the history. "pending" is a reservation still waiting to be collected.
+const MINE_FILTERS = { pending: ['reserved'], collected: ['collected'], missed: ['missed', 'expired'], cancelled: ['cancelled'] };
 router.get('/mine', async (req, res) => {
   const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
   const filter = req.user.role === 'bakery' ? { bakery: req.user._id } : { recipient: req.user._id };
+  const wanted = MINE_FILTERS[req.query.status];
+  if (wanted) filter.status = { $in: wanted };
   await sweepMissed();
-  const [items, total] = await Promise.all([
+  const [docs, total] = await Promise.all([
     Reservation.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * 20).limit(20),
     Reservation.countDocuments(filter),
   ]);
-  res.json({ items: items.map(reservationDTO), total, page, pageSize: 20 });
+  // Only point at a photo when the listing actually has one (the listing may have ended since).
+  const withPhoto = new Set((await Listing.find({ _id: { $in: docs.map((d) => d.listing) }, 'photo.contentType': { $exists: true } }).select('_id'))
+    .map((l) => String(l._id)));
+  const items = docs.map((d) => ({ ...reservationDTO(d), photoUrl: withPhoto.has(String(d.listing)) ? `/api/reservations/${d._id}/photo` : null }));
+  res.json({ items, total, page, pageSize: 20 });
+});
+
+// The photo of the food a reservation is for. Unlike /listings/:id/photo it still works once the listing has ended,
+// but only for the person who reserved it and the bakery that listed it.
+router.get('/:id/photo', async (req, res) => {
+  const r = await Reservation.findById(req.params.id).select('listing bakery recipient');
+  const mine = r && [r.bakery, r.recipient].some((u) => String(u) === String(req.user._id));
+  const doc = mine && await Listing.findById(r.listing).select('photo');
+  if (!doc?.photo?.data) return res.status(404).end();
+  res.set({
+    'Content-Type': doc.photo.contentType,
+    'Cache-Control': 'private, max-age=300',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+  });
+  res.send(doc.photo.data);
 });
 
 // Reservations whose slot starts within the next half hour or is under way: drives in-app reminders.

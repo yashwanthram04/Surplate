@@ -2,7 +2,7 @@
 // listing. No server and no database, so they run in milliseconds (the API tests cover the same rules end to end).
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { checkPhoto, isInSingapore, MAX_PHOTO_BYTES, parseListingInput, toList } from '../src/utils/validate.js';
+import { checkPhoto, checkPhotos, isInSingapore, MAX_PHOTO_BYTES, MAX_PHOTOS, parseListingInput, toList } from '../src/utils/validate.js';
 import { canView, hasFullAccess, visibilityFilter } from '../src/utils/visibility.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -205,6 +205,29 @@ describe('checkPhoto', () => {
   test('rejects photos over 2 MB, accepts exactly 2 MB', () => {
     assert.match(checkPhoto(file(PNG, MAX_PHOTO_BYTES + 1)).error, /2 MB/);
     assert.ok(checkPhoto(file(PNG, MAX_PHOTO_BYTES)).photo);
+  });
+});
+
+describe('checkPhotos', () => {
+  const png = () => ({ buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, ...new Array(20).fill(0)]), size: 24 });
+
+  test('needs at least one photo', () => {
+    assert.match(checkPhotos([]).error, /required/);
+    assert.match(checkPhotos(undefined).error, /required/);
+  });
+
+  test('keeps the upload order, so the first is the cover', () => {
+    assert.equal(checkPhotos([png(), png(), png()]).photos.length, 3);
+  });
+
+  test(`allows ${MAX_PHOTOS} photos but not more`, () => {
+    assert.ok(checkPhotos(Array.from({ length: MAX_PHOTOS }, png)).photos);
+    assert.match(checkPhotos(Array.from({ length: MAX_PHOTOS + 1 }, png)).error, /up to/);
+  });
+
+  test('names the photo that is not an image', () => {
+    const bad = { buffer: Buffer.from('not an image at all, just text'), size: 30 };
+    assert.match(checkPhotos([png(), bad]).error, /^Photo 2:/);
   });
 });
 

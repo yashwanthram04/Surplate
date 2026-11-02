@@ -104,15 +104,15 @@ const hasStats = computed(() => stats.value !== null);
               </template>
               <template v-else-if="session.isBakery">
                 <RouterLink to="/listings/new" class="btn btn-primary btn-lg btn-lift px-4" data-testid="cta-post"><i class="bi bi-plus-lg me-2" aria-hidden="true"></i>Post surplus food</RouterLink>
-                <RouterLink to="/my-listings" class="btn btn-outline-primary btn-lg btn-lift px-4 bg-white">My listings</RouterLink>
+                <RouterLink to="/my-listings" class="btn btn-outline-primary btn-lg btn-lift btn-on-white px-4">My listings</RouterLink>
               </template>
               <template v-else-if="session.isAdmin">
                 <RouterLink to="/admin/charities" class="btn btn-primary btn-lg btn-lift px-4" data-testid="cta-admin"><i class="bi bi-patch-check me-2" aria-hidden="true"></i>Verify charities</RouterLink>
-                <RouterLink to="/browse" class="btn btn-outline-primary btn-lg btn-lift px-4 bg-white">Browse food</RouterLink>
+                <RouterLink to="/browse" class="btn btn-outline-primary btn-lg btn-lift btn-on-white px-4">Browse food</RouterLink>
               </template>
               <template v-else>
                 <RouterLink to="/browse" class="btn btn-primary btn-lg btn-lift px-4" data-testid="cta-find"><i class="bi bi-geo-alt me-2" aria-hidden="true"></i>Find food near me</RouterLink>
-                <RouterLink to="/profile" class="btn btn-outline-primary btn-lg btn-lift px-4 bg-white">My account</RouterLink>
+                <RouterLink to="/profile" class="btn btn-outline-primary btn-lg btn-lift btn-on-white px-4">My account</RouterLink>
               </template>
             </div>
             <div v-if="!session.isLoggedIn" class="mt-3 small text-body-secondary hero-note">

@@ -122,6 +122,17 @@
   padding-bottom: 0.08em;
 }
 
+.btn-on-white {
+  /* White resting fill that does not change on hover/press: only .btn-lift's raise animation plays.
+     (Bootstrap's bg-white is !important, so it would hide the outline button's hover fill but not its white hover text.) */
+  --bs-btn-bg: #fff;
+  --bs-btn-hover-bg: #fff;
+  --bs-btn-hover-color: var(--bs-btn-color);
+  --bs-btn-hover-border-color: var(--bs-btn-border-color);
+  --bs-btn-active-bg: #fff;
+  --bs-btn-active-color: var(--bs-btn-color);
+  --bs-btn-active-border-color: var(--bs-btn-border-color);
+}
 .btn-lift {
   transition: box-shadow 0.15s ease;
 }

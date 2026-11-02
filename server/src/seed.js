@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import { connectDb } from './db.js';
@@ -39,7 +40,9 @@ export const DEMO_USERS = [
 ];
 
 /** A simple generated placeholder so seeded listings have a photo. */
-function placeholderPhoto(emoji, from, to) {
+function placeholderPhoto(name, emoji, from, to) {
+  // Real food photos live in ./seed-assets (see CREDITS.md); the generated emoji card is the fallback if one is missing.
+  try { return { data: readFileSync(new URL(`./seed-assets/${name}.jpg`, import.meta.url)), contentType: 'image/jpeg' }; } catch { /* fall through */ }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
 <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
 <rect width="600" height="400" fill="url(#g)"/><text x="300" y="250" font-size="170" text-anchor="middle">${emoji}</text></svg>`;
@@ -59,48 +62,50 @@ function demoListings(now) {
     ...item,
     quantityRemaining: item.quantityRemaining ?? item.quantity,
     photo: placeholderPhoto(...item.photo),
+    extraPhotos: (item.extraPhotos ?? []).map((args) => placeholderPhoto(...args)),
   });
   const [sunrise, crumb, golden] = DEMO_USERS;
   return [
     row(sunrise, SITES.sunrise, {
       itemName: 'Assorted croissants', visibleToIndividuals: true, description: 'Butter and almond croissants baked this morning.',
       quantity: 12, dietaryTags: ['vegetarian'], allergens: ['gluten', 'dairy', 'eggs', 'nuts'],
-      pickupStart: t(-20), pickupEnd: t(90), bestBefore: t(8 * 60), photo: ['🥐', '#fde68a', '#f59e0b'],
+      pickupStart: t(-20), pickupEnd: t(90), bestBefore: t(8 * 60), photo: ['croissants', '🥐', '#fde68a', '#f59e0b'],
+      extraPhotos: [['croissant-jam', '🥐', '#fde68a', '#f59e0b'], ['croissant-almond', '🥐', '#fde68a', '#f59e0b']], // gallery demo
     }),
     row(sunrise, SITES.sunrise, {
       itemName: 'Sourdough loaves', visibleToIndividuals: false, description: 'Whole loaves, unsliced.',
       quantity: 6, dietaryTags: ['vegan', 'vegetarian'], allergens: ['gluten'],
-      pickupStart: t(-10), pickupEnd: t(240), bestBefore: t(24 * 60), photo: ['🍞', '#fed7aa', '#c2410c'],
+      pickupStart: t(-10), pickupEnd: t(240), bestBefore: t(24 * 60), photo: ['sourdough', '🍞', '#fed7aa', '#c2410c'],
     }),
     row(sunrise, SITES.sunrise, {
       itemName: 'Kaya toast sets', visibleToIndividuals: true, description: 'Left over from the breakfast rush.',
       quantity: 16, quantityRemaining: 2, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
-      pickupStart: t(-180), pickupEnd: t(-60), bestBefore: t(-30), photo: ['🍞', '#d9f99d', '#65a30d'],
+      pickupStart: t(-180), pickupEnd: t(-60), bestBefore: t(-30), photo: ['kaya-toast', '🍞', '#d9f99d', '#65a30d'],
     }),
     row(crumb, SITES.crumb, {
       itemName: 'Chocolate muffins', visibleToIndividuals: false, description: 'Double chocolate, packed in boxes of 4.',
       quantity: 20, dietaryTags: ['vegetarian'], allergens: ['gluten', 'dairy', 'eggs', 'soy'],
-      pickupStart: t(45), pickupEnd: t(180), bestBefore: t(24 * 60), photo: ['🧁', '#fbcfe8', '#be185d'],
+      pickupStart: t(45), pickupEnd: t(180), bestBefore: t(24 * 60), photo: ['muffins', '🧁', '#fbcfe8', '#be185d'],
     }),
     row(crumb, SITES.crumb, {
       itemName: 'Vegan banana bread', visibleToIndividuals: true, description: 'Sliced loaf, individually wrapped.',
       quantity: 15, dietaryTags: ['vegan', 'vegetarian', 'dairy-free', 'egg-free'], allergens: ['gluten', 'nuts'],
-      pickupStart: t(-5), pickupEnd: t(300), bestBefore: t(48 * 60), photo: ['🍌', '#fef08a', '#a16207'],
+      pickupStart: t(-5), pickupEnd: t(300), bestBefore: t(48 * 60), photo: ['banana-bread', '🍌', '#fef08a', '#a16207'],
     }),
     row(crumb, SITES.crumb, {
       itemName: 'Egg tarts', visibleToIndividuals: true, description: 'Classic Portuguese-style egg tarts.',
       quantity: 18, dietaryTags: ['vegetarian'], allergens: ['gluten', 'eggs', 'dairy'],
-      pickupStart: t(-15), pickupEnd: t(150), bestBefore: t(12 * 60), photo: ['🥧', '#fde68a', '#d97706'],
+      pickupStart: t(-15), pickupEnd: t(150), bestBefore: t(12 * 60), photo: ['egg-tarts', '🥧', '#fde68a', '#d97706'],
     }),
     row(golden, SITES.golden, {
       itemName: 'Pandan buns', visibleToIndividuals: true, description: 'Soft pandan buns with coconut filling.',
       quantity: 30, dietaryTags: ['halal', 'vegetarian'], allergens: ['gluten', 'eggs'],
-      pickupStart: t(-60), pickupEnd: t(360), bestBefore: t(24 * 60), photo: ['🥯', '#bbf7d0', '#15803d'],
+      pickupStart: t(-60), pickupEnd: t(360), bestBefore: t(24 * 60), photo: ['coconut-bun', '🥯', '#bbf7d0', '#15803d'],
     }),
     row(golden, SITES.golden, {
       itemName: 'Curry puffs', visibleToIndividuals: false, description: 'Chicken curry puffs, halal-certified.',
       quantity: 24, dietaryTags: ['halal', 'dairy-free'], allergens: ['gluten', 'eggs'],
-      pickupStart: t(0), pickupEnd: t(75), bestBefore: t(10 * 60), photo: ['🥟', '#fed7aa', '#ea580c'],
+      pickupStart: t(0), pickupEnd: t(75), bestBefore: t(10 * 60), photo: ['curry-puffs', '🥟', '#fed7aa', '#ea580c'],
     }),
   ];
 }

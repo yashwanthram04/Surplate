@@ -16,6 +16,9 @@ const reviews = useReviews(); // REVIEWS FEATURE
 const route = useRoute();
 const items = ref([]), page = ref(1), total = ref(0), loading = ref(true), error = ref(''), busy = ref(false), notice = ref('');
 const reliability = ref(null);
+const FILTERS = [['', 'All'], ['pending', 'Pending'], ['collected', 'Collected'], ['missed', 'Missed'], ['cancelled', 'Cancelled']];
+const statusFilter = ref('');
+const EMPTY_TEXT = { pending: 'No pending reservations.', collected: 'Nothing collected yet.', missed: 'No missed pickups. Nice!', cancelled: 'No cancelled reservations.' };
 const justReserved = computed(() => items.value.find((r) => r.id === route.query.reserved && r.status === 'reserved'));
 
 // quiet: refresh in place (after cancel/change) so the list animates the change instead of reloading.
@@ -23,7 +26,7 @@ async function load({ quiet = false } = {}) {
   if (!quiet) loading.value = true;
   error.value = '';
   try {
-    const { data } = await api.get('/reservations/mine', { params: { page: page.value } });
+    const { data } = await api.get('/reservations/mine', { params: { page: page.value, ...(statusFilter.value ? { status: statusFilter.value } : {}) } });
     items.value = data.items; total.value = data.total;
     if (!session.isBakery) reliability.value = (await api.get('/reservations/reliability')).data;
     reviews.refresh(); // REVIEWS FEATURE: which collected pickups still need a thank-you
@@ -67,6 +70,11 @@ async function saveEdit() {
 const time = (ms) => new Date(ms).getTime();
 function status(row) { return row.status === 'reserved' && time(row.missedAfter) <= now.value ? 'missed' : row.status; }
 const canChange = (row) => status(row) === 'reserved' && time(row.slotEnd) > now.value;
+async function setFilter(value) {
+  if (value === statusFilter.value) return;
+  statusFilter.value = value; page.value = 1;
+  await load({ quiet: true });
+}
 async function move(delta) { page.value += delta; await load(); }
 onMounted(load);
 </script>
@@ -90,9 +98,22 @@ onMounted(load);
     </Transition>
     <p v-if="loading" role="status">Loading reservations…</p>
     <template v-else>
-      <div v-if="!items.length && !error" class="bg-white border rounded-4 p-4">No reservations yet. <RouterLink v-if="!session.isBakery" to="/browse">Browse food</RouterLink></div>
+      <div class="status-filter d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Filter by status">
+        <button v-for="[value, label] in FILTERS" :key="value" type="button" class="btn btn-sm rounded-pill"
+          :class="statusFilter === value ? 'btn-primary' : 'btn-outline-secondary'" :aria-pressed="statusFilter === value"
+          :data-testid="`filter-${value || 'all'}`" @click="setFilter(value)">{{ label }}</button>
+      </div>
+      <div v-if="!items.length && !error" class="bg-white border rounded-4 p-4" data-testid="reservations-empty">
+        <template v-if="statusFilter">{{ EMPTY_TEXT[statusFilter] }} <button type="button" class="btn btn-link p-0 align-baseline" @click="setFilter('')">Show all</button></template>
+        <template v-else>No reservations yet. <RouterLink v-if="!session.isBakery" to="/browse">Browse food</RouterLink></template>
+      </div>
       <TransitionGroup appear :css="false" @enter="riseIn" @leave="collapseOut">
-      <article v-for="(row, index) in items" :key="row.id" :data-index="index" class="bg-white border rounded-4 p-3 mb-3" data-testid="reservation-row">
+      <article v-for="(row, index) in items" :key="row.id" :data-index="index" class="bg-white border rounded-4 p-3 mb-3 res-row" :class="{ 'res-dim': ['missed', 'cancelled'].includes(status(row)) }" data-testid="reservation-row">
+        <div class="res-photo" aria-hidden="true">
+          <img v-if="row.photoUrl" :src="row.photoUrl" alt="" loading="lazy" />
+          <span v-else>🥖</span>
+        </div>
+        <div class="res-body">
         <div class="d-flex justify-content-between gap-3">
           <h2 class="h5">{{ row.itemName }}</h2>
           <Transition :css="false" @enter="popIn">
@@ -134,6 +155,7 @@ onMounted(load);
           <button v-if="canChange(row)" class="btn btn-outline-primary btn-sm" :disabled="busy" @click="startEdit(row)">Change</button>
           <button class="btn btn-outline-danger btn-sm" :disabled="busy" @click="cancel(row)">Cancel reservation</button>
         </div>
+        </div>
       </article>
       </TransitionGroup>
       <nav v-if="total > 20" class="d-flex align-items-center gap-3" aria-label="Reservation pages">
@@ -147,4 +169,11 @@ onMounted(load);
 
 <style scoped>
 .code-flip { perspective: 400px; }
+.res-row { display: flex; gap: 1rem; align-items: flex-start; }
+.res-body { flex: 1; min-width: 0; }
+.res-photo { flex: none; width: 6.5rem; height: 6.5rem; border-radius: 0.9rem; overflow: hidden; background: var(--bs-tertiary-bg, #f1f3f0);
+  display: grid; place-items: center; font-size: 2.4rem; }
+.res-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.res-dim .res-photo img { filter: grayscale(0.85); opacity: 0.7; }
+@media (max-width: 480px) { .res-photo { width: 4.5rem; height: 4.5rem; font-size: 1.8rem; } }
 </style>
