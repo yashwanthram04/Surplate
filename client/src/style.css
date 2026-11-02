@@ -1,4 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
+
 :root {
+  --sp-display: 'Fredoka', system-ui, sans-serif;
   --sp-green: #2f7d4f;
   --sp-green-dark: #266440;
   --sp-green-soft: #e6f2ea;
@@ -17,6 +20,19 @@
 body {
   background: var(--sp-cream);
 }
+
+h1, h2, h3 { font-family: var(--sp-display); }
+
+/* Shared banner colours for pages with their own illustrations and motion. */
+.wall-hero.site-illustrated-banner {
+  color: #fff;
+  background: linear-gradient(135deg, #3c9c63, var(--sp-green) 45%, #1e5a39);
+  border-radius: 2rem;
+  box-shadow: 0 26px 48px -26px #26644080;
+}
+.site-illustrated-banner h1 { color: #fff; }
+.site-illustrated-banner .text-body-secondary { color: #ffffffd9 !important; }
+.site-illustrated-banner .section-kicker { color: #ffdf98; }
 
 /* Bootstrap's "primary" recoloured to the Surplate green */
 .btn-primary {

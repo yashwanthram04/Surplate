@@ -1,7 +1,6 @@
 <script setup>
 import { onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
-import FridgeBackdrop from '../components/FridgeBackdrop.vue';
 import FridgeBanner from '../components/FridgeBanner.vue';
 import FridgeMascot from '../components/FridgeMascot.vue';
 import { api, errorMessage } from '../api';
@@ -66,8 +65,7 @@ async function resolve(report) {
 </script>
 
 <template>
-  <div class="mx-auto" style="max-width: 900px">
-    <FridgeBackdrop />
+  <div class="mx-auto" style="max-width: 1280px">
     <FridgeBanner class="mb-4" title="Spoiled food alerts" :mood="tab === 'open' && items.length ? 'low' : 'stocked'" mini :foods="['🧽', '🧤', '🗑️', '💚']">
       <p class="mb-0">
         <template v-if="session.isAdmin">Every spoiled-food report from community fridges.</template>

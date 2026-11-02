@@ -2,7 +2,12 @@
 
 ## Do I need to connect a database?
 
-No. If `server/.env` has no `MONGODB_URI`, the server (`server/src/db.js`) starts a
+**Keep your live MongoDB connection in `server/.env`; no changes are needed.**
+Playwright explicitly sets `MONGODB_URI=''` for its own API process, overriding the
+live connection for that process. It also fixes `GRAMS_PER_MEAL=500` so meal assertions
+are repeatable. E2E tests create and change data only in the temporary database.
+
+When `MONGODB_URI` is empty, the server (`server/src/db.js`) starts a
 **temporary in-memory MongoDB** and seeds it with demo data. On startup it prints:
 
 ```
@@ -35,6 +40,7 @@ Useful variants:
 
 ```bash
 npx playwright test e2e/reservations.spec.js   # one file
+npx playwright test e2e/account-impact.spec.js e2e/impact.spec.js # account and dashboard coverage
 npx playwright test --headed                   # watch the browser
 npx playwright test --ui                       # interactive runner
 npx playwright show-report                     # open the last HTML report
@@ -42,7 +48,10 @@ npx playwright show-report                     # open the last HTML report
 
 ## Writing a new test
 
-1. Start the app: `npm run dev` (web on http://localhost:5173).
+Recording is optional. Stop any existing dev stack first so the recording uses the
+temporary database started below.
+
+1. Start the app with a temporary database: `MONGODB_URI='' npm run dev` (web on http://localhost:5173).
 2. Record a flow: `npx playwright codegen localhost:5173`.
 3. Clean up the recording before saving it in `e2e/`:
    - Import from the local helper: `import { test, expect } from './test.js';`
@@ -77,7 +86,7 @@ async function login(page, name) {
 ## Before committing
 
 ```bash
-npm test   # server tests, then e2e tests
+npm test   # client unit tests, API tests, then e2e tests
 ```
 
 ## Is the database up? (during `npm run dev`)

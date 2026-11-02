@@ -18,7 +18,7 @@
 }
 
 .font-display {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: var(--sp-display);
   letter-spacing: -0.02em;
 }
 

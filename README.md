@@ -75,6 +75,18 @@ Public community fridges where anyone can take or leave food. This works **indep
 | `GET /api/fridges/alerts?status=open\|resolved` · `GET /api/fridges/alerts/count` | Bakery (reports sent to it) or admin (all) |
 | `POST /api/fridges/alerts/:id/resolve` | The notified bakery or an admin; JSON `{ resolution? }`; once only |
 
+## Shared page styling
+
+`SiteBanner.vue` provides the green banner, food decorations and page-specific icon;
+use its `compact` prop for forms and task pages. Keep each page's title, description
+and actions in its slot, with `BouncingHeading.vue` for accessible animated titles.
+The floating food backdrop is mounted once in `App.vue` on interior pages. Heading
+fonts and colours come from `style.css`; the existing home, fridge and Thank-you
+Wall illustrations and scroll effects remain in their own components. All new
+title and decoration animations honour reduced motion.
+
+Check responsive banner layouts with `npx playwright test e2e/site-style.spec.js`.
+
 ## Run it locally
 
 Requires Node 20+.

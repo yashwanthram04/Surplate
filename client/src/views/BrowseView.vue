@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import { now } from '../composables/useNow';
@@ -16,6 +18,12 @@ const loading = ref(true);
 const error = ref('');
 const hoverId = ref(null);
 const view = ref('list'); // below the lg breakpoint the page shows either the list or the map
+const mapPanel = ref(null);
+watch(view, async (mode) => {
+  if (mode !== 'map') return;
+  await nextTick();
+  mapPanel.value?.scrollIntoView({ block: 'center', behavior: 'instant' });
+});
 
 // Listings whose pickup window has just closed disappear from the board right away,
 // without waiting for the next refresh.
@@ -73,15 +81,17 @@ onBeforeUnmount(() => {
 <template>
   <div ref="page" class="row g-4">
     <div class="col-12" data-enter>
-      <h1 class="h3 mb-1">Rescue surplus food</h1>
-      <p class="text-body-secondary mb-0">Fresh leftovers from local bakeries, free to collect before the pickup window closes.</p>
-      <!-- Charities-only listings are hidden from everyone except verified charities, so say so instead of leaving people guessing -->
-      <div v-if="!session.hasFullAccess" class="small text-body-secondary mt-2" data-testid="partial-view-note">
-        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-        Verified charities see more during charity priority periods. New listings open to everyone after priority ends; some older listings remain charity-only.
-        <template v-if="session.isCharity">Your charity is awaiting verification.</template>
-        <RouterLink v-else-if="!session.isLoggedIn" to="/register?role=charity">Register a charity</RouterLink>
-      </div>
+      <SiteBanner icon="bi-basket2-fill">
+        <BouncingHeading class="h3 mb-1" text="Rescue surplus food" />
+        <p class="text-body-secondary mb-0">Fresh leftovers from local bakeries, free to collect before the pickup window closes.</p>
+        <!-- Charities-only listings are hidden from everyone except verified charities, so say so instead of leaving people guessing -->
+        <div v-if="!session.hasFullAccess" class="small text-body-secondary mt-2" data-testid="partial-view-note">
+          <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+          Verified charities see more during charity priority periods. New listings open to everyone after priority ends; some older listings remain charity-only.
+          <template v-if="session.isCharity">Your charity is awaiting verification.</template>
+          <RouterLink v-else-if="!session.isLoggedIn" to="/register?role=charity">Register a charity</RouterLink>
+        </div>
+      </SiteBanner>
     </div>
 
     <!-- List / map toggle for small screens -->
@@ -130,7 +140,7 @@ onBeforeUnmount(() => {
       </TransitionGroup>
     </div>
 
-    <div class="col-12 col-lg-5 col-xxl-4 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'list' }">
+    <div ref="mapPanel" class="col-12 col-lg-5 col-xxl-4 mt-lg-4 d-lg-block" :class="{ 'd-none': view === 'list' }">
       <div class="map-sticky">
         <ListingMap :listings="visible" :highlight-id="hoverId" :center="filters.near" :radius-km="filters.near ? filters.radiusKm : 0" :active="view === 'map'" />
       </div>

@@ -1,10 +1,12 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import PasswordInput from '../components/PasswordInput.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import ReliabilityPanel from '../components/ReliabilityPanel.vue'; // REVIEWS FEATURE
 import { ROLE_LABELS } from '../constants';
 import { useFormErrors } from '../composables/useFormErrors';
@@ -101,11 +103,13 @@ const status = computed(() => user.value.verification.status);
 <template>
   <!-- v-if: on log out / account deletion the user is cleared a moment before the redirect happens -->
   <div v-if="user" class="mx-auto" style="max-width: 680px">
-    <div class="d-flex align-items-center gap-2 mb-1">
-      <h1 class="h3 mb-0">My account</h1>
-      <span class="badge text-bg-secondary" data-testid="role-badge">{{ ROLE_LABELS[user.role] }}</span>
-    </div>
-    <p class="text-body-secondary">{{ user.email }}</p>
+    <SiteBanner>
+      <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+        <BouncingHeading class="h3 mb-0" text="My account" />
+        <span class="badge text-bg-secondary" data-testid="role-badge">{{ ROLE_LABELS[user.role] }}</span>
+      </div>
+      <p class="mb-0">{{ user.email }}</p>
+    </SiteBanner>
 
     <!-- charity verification status -->
     <div v-if="user.role === 'charity'" class="mb-4" data-testid="verification-banner">

@@ -2,7 +2,7 @@
    Every animation here is switched off by the prefers-reduced-motion block at the bottom. */
 
 .font-display {
-  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+  font-family: var(--sp-display);
   letter-spacing: -0.02em;
 }
 .section-kicker {
@@ -253,6 +253,7 @@
 .ticker.is-moving { overflow: hidden; }
 .ticker-track { display: flex; width: max-content; }
 .ticker-item {
+  scroll-margin-top: 96px;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;

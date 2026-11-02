@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
@@ -225,7 +227,9 @@ async function focusFirstError() {
 <template>
     <div class="mx-auto" style="max-width: 1100px">
       <RouterLink :to="editing ? { name: 'listing', params: { id } } : '/browse'" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</RouterLink>
-      <h1 class="h3 mt-2">{{ editing ? 'Edit listing' : 'Post surplus food' }}</h1>
+      <SiteBanner compact icon="bi-basket2-fill">
+        <BouncingHeading class="h3 mt-2" :text="editing ? 'Edit listing' : 'Post surplus food'" />
+      </SiteBanner>
 
       <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>
       <div v-else-if="loadError" class="alert alert-warning" role="alert">{{ loadError }} <RouterLink to="/my-listings" class="alert-link">My listings</RouterLink></div>

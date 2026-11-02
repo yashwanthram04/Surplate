@@ -213,6 +213,16 @@ html.fridge-bar-on .map-sticky.fridge-map-wrap { top: 8.6rem; height: calc(100vh
 .fridge-title-xl .word { display: inline-block; white-space: nowrap; margin-right: 0.24em; }
 .fridge-title-xl .ch, .fridge-title-xl .ch-in { display: inline-block; }
 .fridge-title-xl .ch-in { cursor: default; }
+.fridge-title-xl .word { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 575.98px) {
+  .fridge-hero.is-mini {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'stage' 'copy';
+    padding: 1.5rem;
+  }
+  .fridge-hero.is-mini .hero-stage { --stage: 100px; }
+  .fridge-hero.is-mini .hero-copy { padding-right: .75rem; }
+}
 .fridge-hero p { color: rgba(255, 255, 255, 0.92); max-width: 46ch; font-size: 1.05rem; }
 .fridge-hero.is-mini p { font-size: 0.95rem; }
 

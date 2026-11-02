@@ -35,7 +35,9 @@ test('dashboard shows personal, bakery, charity and platform impact and filters 
 });
 
 test('recipient reserves, bakery confirms collection, and history updates impact', async ({ page, browser }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await login(page, 'sunrise');
+  const bakeryBefore = await (await page.request.get('/api/impact')).json();
   const now = Date.now();
   const name = `Dashboard rescue ${now}`;
   const created = await page.request.post('/api/listings', { multipart: {
@@ -48,6 +50,7 @@ test('recipient reserves, bakery confirms collection, and history updates impact
   const listing = await created.json();
   const charityContext = await browser.newContext();
   const charity = await charityContext.newPage();
+  await charity.emulateMedia({ reducedMotion: 'reduce' });
   const errors = [];
   charity.on('pageerror', (e) => errors.push(e.message));
   try {
@@ -61,13 +64,18 @@ test('recipient reserves, bakery confirms collection, and history updates impact
     await expect(recipientRow).toContainText('reserved');
     await expect(recipientRow).toContainText('0.50 kg');
     const code = await recipientRow.getByTestId('reservation-code').innerText();
+    await charity.goto('/impact');
+    const format = (value) => new Intl.NumberFormat('en-SG', { maximumFractionDigits: 2 }).format(value);
+    for (const metric of ['collectedKg', 'estimatedMeals', 'collections']) {
+      await expect(charity.getByTestId(metric)).toHaveText([before.mine, before.platform].map((totals) => format(totals[metric])));
+    }
     await page.goto('/orders');
     await page.getByLabel('Reservation code').fill(code);
     await page.getByRole('button', { name: 'Find order' }).click();
     await expect(page.getByTestId('lookup-result')).toContainText(name);
     await page.getByRole('button', { name: 'Confirm collection' }).click();
     await expect(page.getByTestId('lookup-result')).toContainText('collected');
-    await charity.reload();
+    await charity.goto('/reservations');
     await expect(recipientRow).toContainText('collected');
     await expect(recipientRow.getByRole('button', { name: 'Cancel reservation' })).toHaveCount(0);
     const after = await (await charity.request.get('/api/impact')).json();
@@ -75,6 +83,11 @@ test('recipient reserves, bakery confirms collection, and history updates impact
     expect(after.platform.collectedKg - before.platform.collectedKg).toBeCloseTo(0.5);
     await charity.goto('/impact');
     await expect(charity.getByRole('heading', { name: 'Your charity’s collections' })).toBeVisible();
+    await page.goto('/impact');
+    for (const [metric, increase] of Object.entries({ collectedKg: 0.5, estimatedMeals: 1, collections: 1 })) {
+      await expect(charity.getByTestId(metric)).toHaveText([before.mine, before.platform].map((totals) => format(totals[metric] + increase)));
+      await expect(page.getByTestId(metric)).toHaveText([bakeryBefore.mine, bakeryBefore.platform].map((totals) => format(totals[metric] + increase)));
+    }
     expect(errors).toEqual([]);
   } finally {
     await page.request.delete(`/api/listings/${listing.id}`);

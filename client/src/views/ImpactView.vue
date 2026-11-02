@@ -1,10 +1,12 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { api, errorMessage } from '../api';
 import { useSession } from '../stores/session';
 import { chartPoints, fillTrend } from '../utils/impact';
+import SiteBanner from '../components/SiteBanner.vue';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -148,14 +150,16 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="root" class="impact-dashboard" :aria-busy="loading">
-    <header class="impact-header d-flex justify-content-between align-items-start gap-3 flex-wrap">
-      <div>
-        <span class="eyebrow"><i class="bi bi-flower1 me-1" aria-hidden="true"></i> SMALL ACTIONS. SHARED IMPACT.</span>
-        <h1>Good food. Greater impact.</h1>
-        <p class="text-body-secondary mb-0">A little less waste. A lot more possibility. See what we’re making happen together.</p>
+    <SiteBanner>
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <span class="eyebrow"><i class="bi bi-flower1 me-1" aria-hidden="true"></i> SMALL ACTIONS. SHARED IMPACT.</span>
+          <BouncingHeading text="Good food. Greater impact." />
+          <p class="text-body-secondary mb-0">A little less waste. A lot more possibility. See what we’re making happen together.</p>
+        </div>
+        <RouterLink v-if="!session.isAdmin" :to="session.isBakery ? '/orders' : '/reservations'" class="btn btn-outline-primary rounded-pill">{{ session.isBakery ? 'Manage collections' : 'Reservation history' }} <i class="bi bi-arrow-up-right ms-1" aria-hidden="true"></i></RouterLink>
       </div>
-      <RouterLink v-if="!session.isAdmin" :to="session.isBakery ? '/orders' : '/reservations'" class="btn btn-outline-primary rounded-pill">{{ session.isBakery ? 'Manage collections' : 'Reservation history' }} <i class="bi bi-arrow-up-right ms-1" aria-hidden="true"></i></RouterLink>
-    </header>
+    </SiteBanner>
 
     <form class="impact-filter" @submit.prevent="load">
       <div class="d-flex flex-wrap gap-2 align-items-center">

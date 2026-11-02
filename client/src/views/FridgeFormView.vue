@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
-import FridgeBackdrop from '../components/FridgeBackdrop.vue';
 import FridgeBanner from '../components/FridgeBanner.vue';
 import FridgeMap from '../components/FridgeMap.vue';
 import { MAX_PHOTO_BYTES } from '../constants';
@@ -133,7 +132,6 @@ function focusFirstError() {
 
 <template>
   <div class="mx-auto fridge-form-page" style="max-width: 1100px">
-    <FridgeBackdrop />
     <RouterLink :to="editing ? { name: 'fridge', params: { id } } : { name: 'fridges' }" class="text-decoration-none small"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</RouterLink>
     <FridgeBanner class="mt-2 mb-4" :title="editing ? 'Edit fridge' : 'Add a fridge'" mood="stocked" mini :foods="['🥕', '🥐', '🍎', '🥛']">
       <p class="mb-0">{{ editing ? 'Keep the details up to date so people can find it.' : 'Know a community fridge where anyone can take or leave food? Add it so others can find it.' }}</p>
