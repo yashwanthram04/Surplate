@@ -351,8 +351,8 @@ async function pledge(need) {
   try {
     await api.post(`/needs/${need.id}/pledge`, { quantity });
     success.value = 'Your pledge has been submitted!';
-    burst.value?.celebrate(); // the breads fly up
-    await loadNeeds();
+    burst.value?.celebrate();
+    await refreshAll();
   } catch (err) {
     error.value = errorMessage(err);
   } finally {
@@ -637,7 +637,7 @@ onBeforeUnmount(() => {
 
 /* ===== The wooden board ===== */
 .wood-board {
-  max-width: 1100px;
+  max-width: 1300px;
   position: relative;
   z-index: 1; /* the board sits ON TOP of the floating breads */
   padding: 2rem 1.5rem;
@@ -675,5 +675,12 @@ onBeforeUnmount(() => {
 /* Smaller frame on phones */
 @media (max-width: 576px) {
   .wood-board { border-width: 8px; padding: 1.5rem 0.75rem; }
+}
+
+/* Make the green banner the same width as the wooden board */
+.banner-wrap {
+  max-width: 1300px;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
