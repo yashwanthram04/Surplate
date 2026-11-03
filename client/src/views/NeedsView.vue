@@ -544,8 +544,12 @@ onBeforeUnmount(() => {
 
       <!-- The list of need cards -->
       <div v-else class="row g-3">
-        <div v-for="need in needs" :key="need.id" class="need-item col-12 col-lg-6">
-          <NeedCard
+        <div
+            v-for="need in needs"
+            :key="need.id"
+            class="need-item col-12 col-lg-6"
+            :data-testid="`need-${need.id}`">
+            <NeedCard
             :need="need"
             :is-charity="isCharity"
             :is-bakery="isBakery"
