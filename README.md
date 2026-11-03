@@ -45,6 +45,21 @@ sideways-scrolling audience cards. The rest of the app gets route cross-fades, s
 
 Hidden listings are hidden by the **server** (board, detail page and photo all return nothing/404), not just in the UI.
 
+### Charity Needs Board
+The Charity Needs Board allows verified charities to post food requests and bakeries to pledge surplus food directly to fulfil these needs. Charities can track their requests and view participating bakeries, while bakeries can manage their pledges.
+
+| Capability | Where |
+|---|---|
+| **Post food requests:** Verified charities specify the food needed, quantity, deadline and dietary requirements, with form and server-side validation. | `NeedsForm.vue`, `NeedsView.vue`, `server/src/utils/validateNeed.js` |
+| **View and track requests:** Bakeries can browse charity requests and monitor the quantity pledged, remaining quantity and fulfilment progress. | `NeedsView.vue`, `NeedsCard.vue` |
+| **Edit and cancel requests:** Charities can update their requested quantities or cancel requests. Quantities cannot be reduced below existing pledges. | `NeedsView.vue`, `NeedsCard.vue` |
+| **Pledge surplus food:** Bakeries can pledge food towards requests, with validation preventing contributions from exceeding the remaining quantity. | `NeedsView.vue`, `NeedsCard.vue`, `server/src/routes/needs.js` |
+| **Manage pledges:** Bakeries can view, edit or withdraw their pledges. Charities can view contributing bakeries, pledged quantities and pickup details. | `MyPledges.vue`, `NeedsCard.vue` |
+
+- **New request notifications:** Bakeries receive an in-app banner when new charity requests are detected while the board is open. The board automatically refreshes every 30 seconds.
+
+`client/src/views/NeedsView.vue`, `NeedsForm.vue`, `NeedsCard.vue`, `MyPledges.vue` · `server/src/routes/needs.js` · `e2e/needsboard.spec.js`
+
 ### Community fridges
 Public community fridges where anyone can take or leave food. This works **independently of listings and reservations**, so it covers people outside bakery pickup windows.
 

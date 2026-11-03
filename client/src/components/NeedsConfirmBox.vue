@@ -1,7 +1,5 @@
 <script setup>
 // A small "Are you sure?" box that we draw ourselves,
-// so the browser's "localhost:5173 says..." popup is not needed.
-// It only DRAWS the box. The parent decides what "yes" and "no" do.
 defineProps({
   show: { type: Boolean, default: false }, // true = the box is visible
   title: { type: String, required: true },

@@ -1,16 +1,5 @@
 <script setup>
-// =====================================================
-// NeedsView.vue = the "Charity Needs Board" page
-//
-// Charities: post needs, edit the quantity, cancel needs
-// Bakeries:  pledge food, edit / withdraw their pledges
-//
-// The form, the cards and "my pledges" live in their own files:
-//   NeedsForm.vue / NeedsCard.vue / MyPledges.vue
-// =====================================================
-
 // ---------- 1. Imports ----------
-// (BouncingHeading + SiteBanner are the team's shared look: they must stay as they are)
 import BouncingHeading from '../components/BouncingHeading.vue';
 import SiteBanner from '../components/SiteBanner.vue';
 import BreadConfetti from '../components/BreadConfetti.vue';
@@ -24,13 +13,11 @@ import { gsap } from 'gsap'; // GSAP = animation library
 import { api, errorMessage, fieldErrors } from '../api';
 import { useSession } from '../stores/session';
 
-// Who is logged in? (computed = always up to date)
 const session = useSession();
 const isCharity = computed(() => session.isCharity);
 const isBakery = computed(() => session.isBakery);
 
 // ---------- 2. Variables ----------
-
 // The list of needs from the server
 const needs = ref([]);
 const loading = ref(true); // true = show the loading box
@@ -91,12 +78,11 @@ const editingPledgeId = ref(null);
 const editPledgeQuantity = ref(1);
 const savingPledge = ref(false);
 const withdrawingPledgeId = ref(null);
-const pledgeToWithdraw = ref(null); // the pledge waiting for "yes, withdraw it"
+const pledgeToWithdraw = ref(null);
 const pledgeEditError = ref('');
 const pledgeEditSuccess = ref('');
 
 // ---------- 3. Animations (GSAP) ----------
-
 // The bread confetti component (so we can call burst.value.celebrate())
 const burst = ref(null);
 
@@ -117,8 +103,6 @@ watch(newRequestCount, async (count) => {
 });
 
 // ---------- 4. Loading data from the server ----------
-
-// A quantity is OK if it is a whole number that is 1 or more
 function isValidQuantity(value) {
   const number = Number(value);
   return Number.isInteger(number) && number >= 1;
@@ -189,7 +173,6 @@ async function refreshAll() {
 }
 
 // ---------- 5. Charity actions ----------
-
 // Tick / untick a dietary tag
 function toggleDiet(tag) {
   const position = form.dietaryTags.indexOf(tag);
@@ -425,9 +408,6 @@ async function confirmWithdraw() {
 }
 
 // ---------- Heading hover ----------
-// The team's BouncingHeading only splits the title into WORDS.
-// So, once on this page, we cut each word into single letters (class "ch-in"),
-// and then the CSS below can make one letter jump when you hover over it.
 function splitHeadingLetters() {
   const words = document.querySelectorAll('.needs-heading .title-word');
   words.forEach((word) => {
@@ -477,7 +457,6 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="wood-board mx-auto">
-      <!-- Charity only: form to post a need -->
       <NeedForm
         v-if="isCharity"
         :form="form"
@@ -568,7 +547,6 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Breads that fly up after a pledge or a new need -->
     <BreadConfetti ref="burst" />
 
     <!-- "Are you sure?" boxes (only visible when something is waiting inside them) -->
@@ -595,12 +573,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Loads the Fredoka font from Google Fonts (needs internet) */
 @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap');
 
-/* Same heading font as the Community fridges page: Fredoka (a round, friendly font).
-   fridges.css defines --fc-display as Fredoka, but it only exists once that file has loaded,
-   so we repeat the font name after the comma, and load the font ourselves above. */
+
 .needs-heading,
 .needs-heading :deep(*) {
   font-family: var(--fc-display, 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif);
@@ -613,9 +588,6 @@ onBeforeUnmount(() => {
   font-size: clamp(1.8rem, 4.2vw, 2.8rem);
 }
 
-/* Hover over a WORD: the whole word lifts and grows a little.
-   (translate and scale are used on purpose: the team's bounce animation
-   uses "transform", so these do not fight with it) */
 .needs-heading :deep(.title-word) {
   transition: translate 0.2s ease, scale 0.2s ease;
 }

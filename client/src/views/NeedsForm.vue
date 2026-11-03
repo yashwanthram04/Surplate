@@ -1,7 +1,5 @@
 <script setup>
 // The "Post a food request" form for charities.
-// This file only DRAWS the form. The real work (checking and saving)
-// happens in NeedsView.vue, so we "emit" (send) events up to it.
 defineProps({
   form: { type: Object, required: true },
   dietaryOptions: { type: Array, required: true },
@@ -124,7 +122,6 @@ const emit = defineEmits(['submit', 'toggle-diet']);
 </template>
 
 <style scoped>
-/* The form is a cream paper that slides in when the page opens */
 .form-paper {
   background: #fff8ec;
   border: 2px solid #f0d9b5;
@@ -137,7 +134,6 @@ const emit = defineEmits(['submit', 'toggle-diet']);
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* The bread pin on the top edge */
 .form-pin {
   position: absolute;
   top: -18px;
@@ -147,7 +143,6 @@ const emit = defineEmits(['submit', 'toggle-diet']);
   filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.4));
 }
 
-/* The little bread in the heading hops up and down */
 .bread-hop {
   display: inline-block;
   animation: hop 1.2s ease-in-out infinite;
@@ -158,7 +153,6 @@ const emit = defineEmits(['submit', 'toggle-diet']);
   50% { transform: translateY(-5px) rotate(4deg); }
 }
 
-/* Boxes glow golden when you click into them */
 .form-control {
   transition: box-shadow 0.2s, border-color 0.2s;
 }
@@ -168,7 +162,6 @@ const emit = defineEmits(['submit', 'toggle-diet']);
   box-shadow: 0 0 0 0.25rem rgba(224, 166, 75, 0.35);
 }
 
-/* Dietary buttons grow a little when hovered, and "pop" when you tick them */
 .tag-chip {
   transition: transform 0.15s;
 }
@@ -198,7 +191,6 @@ const emit = defineEmits(['submit', 'toggle-diet']);
   75% { transform: rotate(4deg); }
 }
 
-/* The green success message pops in */
 .alert-success {
   animation: pop 0.4s ease-out;
 }

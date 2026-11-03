@@ -8,10 +8,6 @@ const FOOD_KEYWORDS = [
     'muffin', 'muffins', 'cookie', 'cookies', 'donut',
     'doughnut', 'bagel', 'baguette', 'tart', 'puff',
 
-    // // Rice and noodles
-    // 'rice', 'noodle', 'vermicelli',
-    // 'beehoon', 'porridge', 'congee',
-
     // Meals and cooked food
     'food', 'meal', 'meals', 'lunch', 'dinner', 'breakfast', 'supper',
     'sandwich', 'sandwiches', 'soup', 'curry', 'dumpling',

@@ -1,7 +1,6 @@
 <script setup>
 // One card = one charity request.
-// This file only DRAWS the card. The real work (saving, pledging...)
-// happens in NeedsView.vue, so we "emit" (send) an event up to it.
+
 defineProps({
   need: { type: Object, required: true },
   isCharity: { type: Boolean, default: false },
@@ -178,7 +177,6 @@ const emit = defineEmits(['start-edit', 'stop-edit', 'save-quantity', 'cancel-ne
   filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.4));
 }
 
-/* Open requests: cream paper */
 .need-open {
   background-color: #fff8ec;
   border: 2px solid #f0d9b5 !important; /* !important beats Bootstrap's .border */
@@ -191,12 +189,10 @@ const emit = defineEmits(['start-edit', 'stop-edit', 'save-quantity', 'cancel-ne
   box-shadow: 0 12px 20px rgba(0, 0, 0, 0.4);
 }
 
-/* Golden-brown progress bar, like a baked crust */
 .need-open .progress-bar {
   background-color: #e0a64b;
 }
 
-/* The list of pledging bakeries, with a stitched line above it */
 .pledge-list {
   border-top: 2px dashed #f0d9b5;
   padding-top: 0.75rem;
