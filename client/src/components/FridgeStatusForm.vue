@@ -2,15 +2,21 @@
 import { reactive, ref } from 'vue';
 import { api, errorMessage, fieldErrors } from '../api';
 import { MAX_PHOTO_BYTES } from '../constants';
+import { useSession } from '../stores/session';
 import { FRIDGE_STATUSES, statusMeta } from '../utils/fridge';
 import '../fridges.css';
 
 // "Post a status update": stocked / low / empty, with an optional note and photo.
-// Emits `posted` with the new update as returned by POST /api/fridges/:id/updates.
-const props = defineProps({ fridgeId: { type: String, required: true } });
+// Admins can also resolve the fridge's open spoiled reports in the same step (e.g. after clearing it out).
+// Emits `posted` with the new update as returned by POST /api/fridges/:id/updates (plus reportsResolved if asked).
+const props = defineProps({
+  fridgeId: { type: String, required: true },
+  openReports: { type: Number, default: 0 },
+});
 const emit = defineEmits(['posted']);
+const session = useSession();
 
-const form = reactive({ status: '', note: '' });
+const form = reactive({ status: '', note: '', resolveReports: false });
 const photoFile = ref(null);
 const photoProblem = ref('');
 const photoInput = ref(null);
@@ -40,11 +46,12 @@ async function submit() {
   fd.append('status', form.status);
   fd.append('note', form.note.trim());
   if (photoFile.value) fd.append('photo', photoFile.value);
+  if (session.isAdmin && props.openReports && form.resolveReports) fd.append('resolveReports', 'true');
 
   submitting.value = true;
   try {
     const { data } = await api.post(`/fridges/${props.fridgeId}/updates`, fd);
-    Object.assign(form, { status: '', note: '' });
+    Object.assign(form, { status: '', note: '', resolveReports: false });
     photoFile.value = null;
     if (photoInput.value) photoInput.value.value = '';
     emit('posted', data);
@@ -88,6 +95,14 @@ async function submit() {
       <input id="update-photo" ref="photoInput" type="file" accept="image/jpeg,image/png,image/webp" class="form-control" :class="{ 'is-invalid': errors.photo }" @change="onPhoto" />
       <div class="invalid-feedback">{{ errors.photo }}</div>
       <div class="form-text">JPEG, PNG or WebP, up to 2 MB.</div>
+    </div>
+
+    <div v-if="session.isAdmin && openReports" class="form-check mb-3">
+      <input id="resolve-reports" v-model="form.resolveReports" class="form-check-input" type="checkbox" data-testid="resolve-reports" />
+      <label class="form-check-label" for="resolve-reports">
+        Also mark the {{ openReports === 1 ? 'open spoiled report' : `${openReports} open spoiled reports` }} here as resolved
+      </label>
+      <div class="form-text">Tick this if you've cleared out the spoiled food. Your note is saved as the resolution.</div>
     </div>
 
     <button type="submit" class="btn btn-primary w-100" :disabled="submitting" data-testid="submit-update">

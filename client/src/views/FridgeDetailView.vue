@@ -105,9 +105,15 @@ async function loadUpdates() {
 
 // A new status update from the form: show it at the top and refresh the headline status.
 function onPosted(update) {
-  updates.value = [update, ...updates.value].slice(0, SHOWN_UPDATES);
-  fridge.value = { ...fridge.value, latestStatus: update.status, latestUpdateAt: update.createdAt, latestNote: update.note, foodMayBeStale: false, checking: null };
-  flash.value = 'Thanks! The status has been updated.';
+  const { reportsResolved = 0, ...item } = update;
+  updates.value = [item, ...updates.value].slice(0, SHOWN_UPDATES);
+  fridge.value = {
+    ...fridge.value, latestStatus: item.status, latestUpdateAt: item.createdAt, latestNote: item.note, foodMayBeStale: false, checking: null,
+    openSpoiledReports: Math.max(0, fridge.value.openSpoiledReports - reportsResolved),
+  };
+  flash.value = reportsResolved
+    ? `Thanks! The status has been updated and ${reportsResolved === 1 ? 'the spoiled report was' : `${reportsResolved} spoiled reports were`} marked resolved.`
+    : 'Thanks! The status has been updated.';
   nextTick(() => {
     confetti(update.status);
     hop(statusMascot.value?.$el);
@@ -272,7 +278,7 @@ async function remove() {
 
           <div v-reveal class="bg-white border rounded-4 p-4 mt-4 fridge-panel">
             <h2 class="h5">Post a status update</h2>
-            <FridgeStatusForm v-if="session.isLoggedIn" :fridge-id="fridge.id" @posted="onPosted" />
+            <FridgeStatusForm v-if="session.isLoggedIn" :fridge-id="fridge.id" :open-reports="fridge.openSpoiledReports" @posted="onPosted" />
             <p v-else class="mb-0">
               <RouterLink :to="{ name: 'login', query: { next: route.fullPath } }" data-testid="login-to-post">Log in</RouterLink>
               or <RouterLink :to="{ name: 'register' }">sign up</RouterLink> to tell people if this fridge is stocked, low or empty.

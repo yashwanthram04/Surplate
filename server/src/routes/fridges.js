@@ -286,7 +286,9 @@ router.get('/:id/updates/:updateId/photo', async (req, res) => {
   sendPhoto(res, doc.photo);
 });
 
-// POST /api/fridges/:id/updates (multipart: status, note?, photo?) – any logged-in user.
+// POST /api/fridges/:id/updates (multipart: status, note?, photo?, resolveReports?) – any logged-in user.
+// resolveReports=true (admins only, ignored for anyone else) also resolves this fridge's open spoiled reports,
+// e.g. after clearing out a stale fridge. The response then says how many were resolved.
 // To let signed-out visitors post too, replace `requireLogin` with a middleware that allows guests
 // and store a guest name instead of req.user (add rate limiting if you do).
 router.post('/:id/updates', requireLogin, loadFridge, uploadPhoto, async (req, res) => {
@@ -317,6 +319,14 @@ router.post('/:id/updates', requireLogin, loadFridge, uploadPhoto, async (req, r
     },
     { timestamps: false }
   );
+
+  if (req.user.role === 'admin' && str(req.body?.resolveReports) === 'true') {
+    const { modifiedCount } = await SpoiledReport.updateMany(
+      { fridge: req.fridge._id, status: 'open' },
+      { $set: { status: 'resolved', resolution: update.note || 'Cleared during a fridge check.', resolvedBy: req.user._id, resolvedByName: req.user.name, resolvedAt: new Date() } }
+    );
+    return res.status(201).json({ ...toUpdateDTO(update), reportsResolved: modifiedCount });
+  }
   res.status(201).json(toUpdateDTO(update));
 });
 

@@ -289,6 +289,22 @@ describe('stale fridges (stocked or low, no update for 48 hours)', () => {
     assert.ok(!(await staleList()).some((s) => s.id === f.id));
   });
 
+  test('an admin clearing a fridge can resolve its open spoiled reports in the same update; nobody else can', async () => {
+    const f = await fridgeUpdated('Clear-out fridge', 'stocked', 60);
+    const { report } = await (await flag(f.id, { items: 'Mouldy buns (clear-out)' }, CRUMB)).json(); // Hope has used up the hourly report limit
+
+    const notAdmin = await (await postUpdate(f.id, { status: 'low', resolveReports: 'true' }, ALEX)).json();
+    assert.equal(notAdmin.reportsResolved, undefined);
+    assert.equal((await detail(f.id)).openSpoiledReports, 1, 'the flag is ignored for non-admins');
+
+    const res = await (await postUpdate(f.id, { status: 'empty', note: 'Cleared out old food', resolveReports: 'true' }, ADMIN)).json();
+    assert.equal(res.reportsResolved, 1);
+    assert.equal((await detail(f.id)).openSpoiledReports, 0);
+    const resolved = (await (await call('/fridges/alerts?status=resolved', { user: ADMIN })).json()).items.find((r) => r.id === report.id);
+    assert.equal(resolved.resolution, 'Cleared out old food');
+    assert.equal(resolved.resolvedByName, 'Surplate Admin');
+  });
+
   test('a check that nobody finishes lapses after 24 hours, and fresh fridges cannot be claimed', async () => {
     const f = await fridgeUpdated('Forgotten check fridge', 'stocked', 72);
     await claim(f.id);
