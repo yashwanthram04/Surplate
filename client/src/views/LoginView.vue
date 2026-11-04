@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { errorMessage } from '../api';
@@ -51,8 +53,10 @@ async function submit() {
 
 <template>
   <div class="mx-auto" style="max-width: 440px">
-    <h1 class="h3 mb-1">Welcome back</h1>
-    <p class="text-body-secondary">Log in to post, reserve and manage food.</p>
+    <SiteBanner compact icon="bi-person-heart">
+      <BouncingHeading class="h3 mb-1" text="Welcome back" />
+      <p class="text-body-secondary">Log in to post, reserve and manage food.</p>
+    </SiteBanner>
 
     <form class="bg-white border rounded-4 p-4" novalidate data-testid="login-form" @submit.prevent="submit">
       <div v-if="failure" class="alert alert-danger" role="alert" data-testid="login-error">{{ failure }}</div>

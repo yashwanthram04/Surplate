@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useReviews } from '../stores/reviews';
 import { useSession } from '../stores/session';
+import { vMagnetic } from '../utils/wallMotion';
 import ReviewModal from './ReviewModal.vue';
 
 // A friendly banner under the navigation bar after a recipient has collected food: "How was your sourdough?".
@@ -42,7 +43,7 @@ onBeforeUnmount(() => clearInterval(timer));
           Tell {{ next.bakeryName }} in a few seconds: their team reads every note.<template v-if="reviews.count > 1"> ({{ reviews.count }} pickups waiting)</template>
         </span>
       </div>
-      <button type="button" class="btn btn-primary btn-sm" data-testid="open-review" @click="reviews.open(next)">Say thanks</button>
+      <button v-magnetic type="button" class="btn btn-primary btn-sm" data-testid="open-review" @click="reviews.open(next)">Say thanks</button>
       <button type="button" class="btn-close" aria-label="Dismiss for now" @click="dismiss(next.reservationId)"></button>
     </div>
   </Transition>

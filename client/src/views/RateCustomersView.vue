@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage, fieldErrors } from '../api';
@@ -7,10 +9,13 @@ import { useSession } from '../stores/session';
 import { formatSlot } from '../utils/slots';
 import { burst } from '../utils/confetti';
 import { LIMITS, PUNCTUALITY_LABELS, initialOf, timeAgo } from '../utils/reviews';
+import { stamp, useSmoothScroll } from '../utils/wallMotion';
 
 // Bakery staff rate the customers they handed food to: how punctual were they? Ratings feed the customer's
-// reliability score. Each card flies off the list once rated, and a progress bar fills as the queue empties.
+// reliability score. A "Rated" stamp lands on each card before it flies off the list, and a progress bar fills as
+// the queue empties.
 const session = useSession();
+useSmoothScroll();
 const items = ref([]);
 const total = ref(0); // how many were waiting when the page opened, for the progress bar
 const loading = ref(true);
@@ -40,6 +45,7 @@ async function load() {
 
 async function submit(item, event) {
   const d = draft(item.reservationId);
+  const card = event.target.closest('.rate-card'); // found now: the form inside it is replaced once rated
   d.error = '';
   if (!d.punctuality) { d.error = 'Choose a star rating first.'; return; }
   if (d.comment.trim().length > LIMITS.commentMax) { d.error = `Keep the comment under ${LIMITS.commentMax} characters.`; return; }
@@ -49,7 +55,8 @@ async function submit(item, event) {
     d.done = true;
     rated.value++;
     burst(event.target, { emojis: ['⭐', '✨', '👍'], count: 10, spread: 130 });
-    setTimeout(() => (items.value = items.value.filter((i) => i.reservationId !== item.reservationId)), 650);
+    await stamp(card, 'Rated');
+    setTimeout(() => (items.value = items.value.filter((i) => i.reservationId !== item.reservationId)), 400);
   } catch (e) {
     d.error = fieldErrors(e).punctuality || fieldErrors(e).comment || errorMessage(e);
     if (e.response?.status === 409) setTimeout(() => (items.value = items.value.filter((i) => i.reservationId !== item.reservationId)), 1500);
@@ -62,11 +69,13 @@ onMounted(load);
 
 <template>
   <div class="mx-auto" style="max-width: 820px">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-      <h1 class="h3 mb-1">Rate your customers</h1>
-      <RouterLink :to="{ name: 'bakery-wall', params: { id: session.user.id } }" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chat-heart me-1" aria-hidden="true"></i>Your Thank-you Wall</RouterLink>
-    </div>
-    <p class="text-body-secondary">Were they on time for their slot? Your rating counts for 20% of the customer’s reliability score, and helps other bakeries know who to count on. Only collected pickups from the last 30 days can be rated.</p>
+    <SiteBanner compact icon="bi-star-fill">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <BouncingHeading class="h3 mb-1" text="Rate your customers" />
+        <RouterLink :to="{ name: 'bakery-wall', params: { id: session.user.id } }" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chat-heart me-1" aria-hidden="true"></i>Your Thank-you Wall</RouterLink>
+      </div>
+      <p class="text-body-secondary">Were they on time for their slot? Your rating counts for 20% of the customer’s reliability score, and helps other bakeries know who to count on. Only collected pickups from the last 30 days can be rated.</p>
+    </SiteBanner>
 
     <div v-if="error" class="alert alert-danger" role="alert">{{ error }} <button class="btn btn-sm btn-outline-danger ms-2" @click="load">Retry</button></div>
     <div v-if="loading" class="text-center py-5"><div class="spinner-border text-secondary" role="status"><span class="visually-hidden">Loading…</span></div></div>

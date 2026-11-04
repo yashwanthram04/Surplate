@@ -9,6 +9,7 @@ import { fail, transaction } from '../services/reservations.js';
 import { toNeedDTO, toPledgeDTO } from '../utils/serialiseNeed.js';
 import { toList } from '../utils/validate.js';
 import { parseNeedInput, parsePledgeInput } from '../utils/validateNeed.js';
+import User from '../models/User.js';
 
 const router = Router();
 const BROWSE_LIMIT = 100;
@@ -88,13 +89,34 @@ const docs = await Need.find(filter).sort({ neededBy: 1, _id: 1 }).limit(BROWSE_
 res.json({ items: docs.map((d) => toNeedDTO(d, { now })) });
 });
 
-// GET /api/needs/mine – the signed-in charity's needs (every status), each with its active pledges.
+// GET /api/needs/mine – the signed-in charity's needs, each with its active pledges
+// and where to collect each pledge.
 router.get('/mine', requireCharity, async (req, res) => {
   const docs = await Need.find({ charity: req.user._id }).sort({ createdAt: -1 }).limit(100);
   const pledges = await Pledge.find({ need: { $in: docs.map((d) => d._id) }, status: 'pledged' }).sort({ createdAt: -1 });
+
+  // Group the pledges by need
   const byNeed = new Map();
   for (const p of pledges) byNeed.set(String(p.need), [...(byNeed.get(String(p.need)) ?? []), p]);
-  res.json({ items: docs.map((d) => toNeedDTO(d, { pledges: byNeed.get(String(d._id)) ?? [] })) });
+
+  // NEW: look up each bakery's address and phone, so the charity knows where to collect
+  const bakeries = await User.find({ _id: { $in: pledges.map((p) => p.bakery) } }).select('address postal phone');
+  const bakeryById = new Map(bakeries.map((b) => [String(b._id), b]));
+
+  const items = docs.map((d) => {
+    const need = toNeedDTO(d, { pledges: byNeed.get(String(d._id)) ?? [] });
+    for (const p of need.pledges) {
+      const bakery = bakeryById.get(p.bakery.id);
+      p.pickup = {
+        address: bakery?.address ?? '',
+        postal: bakery?.postal ?? '',
+        phone: bakery?.phone ?? '',
+      };
+    }
+    return need;
+  });
+
+  res.json({ items });
 });
 
 // POST /api/needs – post a new need.

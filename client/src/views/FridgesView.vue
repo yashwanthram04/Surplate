@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
 import AddressSearch from '../components/AddressSearch.vue';
-import FridgeBackdrop from '../components/FridgeBackdrop.vue';
 import FridgeBanner from '../components/FridgeBanner.vue';
 import FridgeCard from '../components/FridgeCard.vue';
 import FridgeMascot from '../components/FridgeMascot.vue';
@@ -131,7 +130,6 @@ const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.f
 
 <template>
   <div class="row g-4">
-    <FridgeBackdrop />
     <FridgeStickyBar :show="barOn" title="Community fridges" :mood="heroMood" :stats="barStats" />
     <div ref="heroCol" class="col-12">
       <FridgeBanner title="Community fridges" :mood="heroMood" :fridges="items">

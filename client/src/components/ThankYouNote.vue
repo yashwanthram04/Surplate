@@ -3,11 +3,13 @@ import { computed, ref } from 'vue';
 import { Motion } from 'motion-v';
 import { now } from '../composables/useNow';
 import { LIMITS, initialOf, noteLook, timeAgo } from '../utils/reviews';
+import { vTilt } from '../utils/wallMotion';
 import StarRating from './StarRating.vue';
 
 // One thank-you on the wall: a sticky note with a little tilt, tape, a pin when the bakery has pinned it, the
 // star ratings, a "on behalf of" ribbon for charities and the bakery's reply. Bakery staff also get pin and
-// reply controls. `preview` renders the same note inside the review form, without motion or controls.
+// reply controls; the note's author gets edit and delete. `preview` renders the same note inside the review form,
+// without motion or controls.
 const props = defineProps({
   note: { type: Object, required: true },
   manage: Boolean,
@@ -16,7 +18,7 @@ const props = defineProps({
   index: { type: Number, default: 0 }, // position in the wall: staggers the entrance
   preview: Boolean,
 });
-const emit = defineEmits(['pin', 'reply']);
+const emit = defineEmits(['pin', 'reply', 'edit', 'remove']);
 
 const look = computed(() => noteLook(props.note.id));
 const replying = ref(false);
@@ -51,8 +53,10 @@ function sendReply() {
     class="note"
     :class="{ 'is-preview': preview }"
     data-testid="thank-you-note"
+    :data-note-id="note.id"
   >
-    <article class="note-paper" :class="[`note-tone-${look.tone}`, { 'is-pinned': note.pinned }]" :style="{ '--tilt': preview ? '0deg' : `${look.tilt}deg` }">
+    <article v-tilt="preview ? 0 : 9" class="note-paper" :class="[`note-tone-${look.tone}`, { 'is-pinned': note.pinned }]" :style="{ '--tilt': preview ? '0deg' : `${look.tilt}deg`, '--k': preview ? 0 : note.pinned ? 0.15 : look.sway }">
+      <span class="note-glare" aria-hidden="true"></span>
       <span class="note-tape" aria-hidden="true"></span>
       <span v-if="note.pinned" class="note-pin" role="img" aria-label="Pinned by the bakery" data-testid="pinned-badge">📌</span>
 
@@ -102,6 +106,15 @@ function sendReply() {
           </div>
           <div v-if="replyError" class="text-danger small">{{ replyError }}</div>
         </form>
+      </div>
+
+      <div v-if="note.mine && !manage && !preview" class="note-tools">
+        <button type="button" class="btn btn-sm note-tool" :disabled="busy" data-testid="edit-note-btn" @click="emit('edit', note)">
+          <i class="bi bi-pencil" aria-hidden="true"></i> Edit
+        </button>
+        <button type="button" class="btn btn-sm note-tool note-tool-danger" :disabled="busy" data-testid="delete-note-btn" @click="emit('remove', note, $event)">
+          <i class="bi bi-trash3" aria-hidden="true"></i> Delete
+        </button>
       </div>
     </article>
   </component>

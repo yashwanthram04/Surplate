@@ -1,4 +1,6 @@
 <script setup>
+import BouncingHeading from '../components/BouncingHeading.vue';
+import SiteBanner from '../components/SiteBanner.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
@@ -101,11 +103,13 @@ async function release() {
 
 <template>
   <div class="mx-auto" style="max-width: 1100px">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-      <h1 class="h3">Orders</h1>
-      <RouterLink to="/reservations" class="btn btn-outline-secondary btn-sm">Order history</RouterLink>
-    </div>
-    <p class="text-body-secondary">Ask the customer for their reservation code to confirm a collection. Orders not collected within 15 minutes after their slot are released automatically. You can release a no-show sooner once the slot has started.</p>
+    <SiteBanner compact icon="bi-bag-check-fill">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+        <BouncingHeading class="h3" text="Orders" />
+        <RouterLink to="/reservations" class="btn btn-outline-secondary btn-sm">Order history</RouterLink>
+      </div>
+      <p class="text-body-secondary">Ask the customer for their reservation code to confirm a collection. Orders not collected within 15 minutes after their slot are released automatically. You can release a no-show sooner once the slot has started.</p>
+    </SiteBanner>
     <Transition :css="false" @enter="dropIn">
       <div v-if="notice" :key="notice" class="alert alert-success" role="status"><i class="bi bi-check-circle-fill me-1 d-inline-block" data-anim="icon" aria-hidden="true"></i>{{ notice }}</div>
     </Transition>

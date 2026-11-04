@@ -1,4 +1,6 @@
 <script setup>
+import SiteBanner from '../components/SiteBanner.vue';
+import BouncingHeading from '../components/BouncingHeading.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api, errorMessage } from '../api';
@@ -81,6 +83,10 @@ async function remove() {
     <div v-else-if="error" class="alert alert-danger mt-3" role="alert">{{ error }} <button class="btn btn-sm btn-outline-danger ms-2" @click="load">Retry</button></div>
 
     <template v-else-if="listing">
+      <SiteBanner class="mt-3" icon="bi-basket2-fill">
+        <BouncingHeading class="h3 mb-1" data-testid="listing-title" :text="listing.itemName" />
+        <p class="mb-0">{{ listing.bakery.name }}</p>
+      </SiteBanner>
       <div v-if="flash" class="alert alert-success alert-dismissible mt-3" role="status" data-testid="flash">
         {{ flash }}
         <button type="button" class="btn-close" aria-label="Dismiss" @click="flash = ''"></button>
@@ -102,7 +108,6 @@ async function remove() {
           <div class="bg-white border rounded-4 p-4" data-enter>
             <div class="d-flex justify-content-between align-items-start gap-3">
               <div>
-                <h1 class="h3 mb-1" data-testid="listing-title">{{ listing.itemName }}</h1>
                 <div class="text-body-secondary">{{ listing.bakery.name }}</div>
                 <!-- REVIEWS FEATURE: link to the bakery's Thank-you Wall -->
                 <RouterLink :to="{ name: 'bakery-wall', params: { id: listing.bakery.id } }" class="thanks-chip mt-1" data-testid="wall-link">

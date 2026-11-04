@@ -272,3 +272,88 @@ test('the reduced-motion setting turns the animations off but keeps every number
   const motion = await page.evaluate(() => getComputedStyle(document.querySelector('.gauge-halo')).animationName);
   expect(motion).toBe('none');
 });
+
+test('the author edits their note and then deletes it; both changes are saved for everyone', async ({ page, browser }) => {
+  // set up through the API: Sunrise lists food, Hope reserves and collects it, and leaves a thank-you
+  const staff = await asUser(browser, 'sunrise');
+  const now = Date.now();
+  const itemName = `Edit-me rolls ${now}`;
+  const first = `First thoughts ${now}`;
+  const edited = `Second thoughts ${now}`;
+  try {
+    const created = await staff.page.request.post('/api/listings', { multipart: {
+      itemName, quantity: '3', weightGramsPerUnit: '200',
+      pickupStart: new Date(now - 60000).toISOString(), pickupEnd: new Date(now + 3600000).toISOString(), bestBefore: new Date(now + 7200000).toISOString(),
+      address: '56 ENG HOON STREET', lat: '1.2851', lng: '103.8317', photo: { name: 'food.png', mimeType: 'image/png', buffer: photo },
+    } });
+    expect(created.status()).toBe(201);
+    const listing = await created.json();
+    await login(page, 'hope');
+    const reservation = await (await page.request.post('/api/reservations', { data: { listingId: listing.id, quantity: 1, slotStart: listing.pickupStart } })).json();
+    expect((await staff.page.request.post(`/api/reservations/${reservation.id}/collect`, { data: { code: reservation.code } })).ok()).toBe(true);
+    const posted = await page.request.post('/api/reviews', { data: { reservationId: reservation.id, note: first, foodRating: 3, accuracyRating: 3 } });
+    expect(posted.status()).toBe(201);
+  } finally {
+    await staff.context.close();
+  }
+
+  await page.goto(await wallUrl(page));
+  const mine = note(page, first);
+  await expect(mine).toContainText('you');
+
+  // edit: the form opens filled in; the change shows on the wall without a reload
+  await mine.getByTestId('edit-note-btn').click();
+  const modal = page.getByTestId('review-modal');
+  await expect(modal).toContainText('Edit your note');
+  await expect(modal.getByLabel('Your thank-you note')).toHaveValue(first);
+  await expect(modal.getByRole('radiogroup', { name: 'Food rating' }).getByRole('radio', { name: /^3 stars/ })).toHaveAttribute('aria-checked', 'true');
+  await modal.getByLabel('Your thank-you note').fill(edited);
+  await modal.getByRole('radiogroup', { name: 'Food rating' }).getByRole('radio', { name: /^5 stars/ }).click();
+  await modal.getByTestId('send-thanks').click();
+  await expect(modal).toHaveCount(0);
+  const changed = note(page, edited);
+  await expect(changed).toBeVisible();
+  await expect(changed.getByRole('img', { name: 'Food: 5 out of 5 stars' })).toBeVisible();
+  await expect(note(page, first)).toHaveCount(0);
+
+  // saved in the database: a visitor in another browser sees the edited note
+  const guest = await browser.newContext();
+  try {
+    const guestPage = await guest.newPage();
+    await guestPage.goto(await wallUrl(guestPage));
+    await expect(note(guestPage, edited)).toBeVisible();
+    await expect(note(guestPage, edited).getByTestId('edit-note-btn')).toHaveCount(0); // only the author gets the controls
+  } finally {
+    await guest.close();
+  }
+
+  // delete: asks first, cancel keeps it, confirm crumples it off the wall
+  await changed.getByTestId('delete-note-btn').click();
+  const dialog = page.getByRole('dialog', { name: 'Delete your note?' });
+  await expect(dialog).toContainText(edited);
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(changed).toBeVisible();
+  await changed.getByTestId('delete-note-btn').click();
+  await dialog.getByRole('button', { name: 'Delete note' }).click();
+  await expect(note(page, edited)).toHaveCount(0);
+
+  // still gone after a reload, and the pickup is waiting for a thank-you again
+  await page.reload();
+  await expect(page.getByTestId('wall-title')).toHaveText('Sunrise Bakery');
+  await expect(note(page, edited)).toHaveCount(0);
+  await expect(page.getByTestId('wall-prompt')).toContainText(itemName);
+});
+
+test('clicking a quote in the thank-you ticker glides down the wall to that note', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(await wallUrl(page));
+  const ticker = page.getByTestId('ticker');
+  await expect(ticker).toBeVisible();
+  // the last note on the wall is below the fold to begin with
+  const last = page.getByTestId('thank-you-note').last();
+  const quote = (await last.getByTestId('note-text').innerText()).slice(0, 20);
+  await expect(last).not.toBeInViewport();
+  await ticker.hover(); // the ticker stops under the mouse, so a quote can be clicked
+  await ticker.getByTestId('ticker-item').filter({ hasText: quote }).first().click();
+  await expect(last).toBeInViewport({ ratio: 0.5 });
+});

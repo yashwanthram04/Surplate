@@ -22,7 +22,7 @@ export default defineConfig({
     {
       command: 'npm --prefix server start',
       url: `http://localhost:${API_PORT}/api/stats`,
-      env: { PORT: String(API_PORT), MONGODB_URI: '' },
+      env: { PORT: String(API_PORT), MONGODB_URI: '', GRAMS_PER_MEAL: '500' },
       reuseExistingServer: false,
       timeout: 120_000,
     },
