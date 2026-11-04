@@ -101,9 +101,9 @@
   text-align: center;
   flex-shrink: 0;
 }
-.gauge-good { --g: var(--sp-green); }
-.gauge-warn { --g: var(--sp-amber); }
-.gauge-bad { --g: var(--sp-red); }
+.gauge-good { --g: var(--sp-green); --g-text: var(--sp-green-dark); }
+.gauge-warn { --g: var(--sp-amber); --g-text: #8a5600; }
+.gauge-bad { --g: var(--sp-red); --g-text: #a32d20; }
 .gauge-dial {
   position: relative;
   margin: 0 auto;
@@ -145,7 +145,7 @@
   justify-content: center;
   font-weight: 700;
   letter-spacing: -0.03em;
-  color: var(--g);
+  color: var(--g-text, var(--g)); /* a darker shade than the ring so the number reads on white */
 }
 .gauge-num {
   display: inline-flex;
@@ -165,6 +165,37 @@
   font-size: 0.8rem;
   font-weight: 600;
   color: #6b6a5f;
+}
+/* On the green wall banner the ring would vanish into the background: sit it on a white disc and whiten the caption */
+.site-illustrated-banner .gauge { padding: 14px 14px 0; box-sizing: content-box; }
+.site-illustrated-banner .gauge-dial {
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 22%, #fff 0%, #fbfdf9 55%, #eef4ea 100%);
+  /* two translucent rings around the disc, then a soft drop shadow */
+  box-shadow:
+    0 0 0 6px rgba(255, 255, 255, 0.2),
+    0 0 0 13px rgba(255, 255, 255, 0.09),
+    0 18px 34px -8px rgba(0, 0, 0, 0.35),
+    inset 0 -6px 14px rgba(47, 125, 79, 0.08);
+}
+.site-illustrated-banner .gauge-track { stroke: #e3e7da; stroke-width: 10; }
+.site-illustrated-banner .gauge-arc { stroke-width: 10; }
+.site-illustrated-banner .gauge-num small { opacity: 0.7; }
+.site-illustrated-banner .gauge-label {
+  display: block;
+  width: max-content;
+  margin: 1.1rem 0 0 50%;
+  transform: translateX(-50%); /* centred on the dial even if the pill is wider than it */
+  padding: 0.3rem 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: #fff;
+  white-space: nowrap;
 }
 .score-good { color: var(--sp-green-dark); font-weight: 600; }
 .score-warn { color: #9a6200; font-weight: 600; }
