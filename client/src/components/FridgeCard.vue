@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { vTilt } from '../composables/useFridgeMotion';
 import { now } from '../composables/useNow';
@@ -13,7 +13,14 @@ const props = defineProps({
 });
 defineEmits(['hover']);
 
-const isLive = computed(() => !!props.fridge.latestUpdateAt && now.value - new Date(props.fridge.latestUpdateAt).getTime() < 60 * 60 * 1000);
+// The shared .listing-card styles hide the photo until it has .is-loaded (a cached photo shows at once).
+const photo = ref(null);
+const loaded = ref(false);
+onMounted(() => {
+  if (photo.value?.complete) loaded.value = true;
+});
+
+const isLive =computed(() => !!props.fridge.latestUpdateAt && now.value - new Date(props.fridge.latestUpdateAt).getTime() < 60 * 60 * 1000);
 </script>
 
 <template>
@@ -28,7 +35,7 @@ const isLive = computed(() => !!props.fridge.latestUpdateAt && now.value - new D
     @focusout="$emit('hover', null)"
   >
     <div class="fridge-card-media">
-      <img v-if="fridge.photoUrl" class="photo" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" loading="lazy" />
+      <img v-if="fridge.photoUrl" ref="photo" class="photo" :class="{ 'is-loaded': loaded }" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" loading="lazy" @load="loaded = true" @error="loaded = true" />
       <div v-else class="photo-placeholder" aria-hidden="true"><FridgeMascot :mood="fridge.latestStatus || 'unknown'" :size="104" /></div>
       <FridgeStatusBadge class="card-status-chip" :status="fridge.latestStatus" />
     </div>
