@@ -48,7 +48,7 @@ h1.banner-title {
   color: #fff;
   text-shadow: 0 5px 0 rgba(0, 0, 0, 0.14);
 }
-.title-word { display: inline-block; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+.title-word { display: inline-block; white-space: pre; overflow-wrap: normal; }
 .ch, .ch-in { display: inline-block; }
 .ch-in { cursor: default; }
 </style>
