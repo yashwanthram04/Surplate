@@ -101,8 +101,9 @@ const status = computed(() => user.value.verification.status);
 </script>
 
 <template>
-  <!-- v-if: on log out / account deletion the user is cleared a moment before the redirect happens -->
   <div v-if="user" class="mx-auto" style="max-width: 680px">
+    <!-- v-if: on log out / account deletion the user is cleared a moment before the redirect happens.
+         Keep this comment inside the div: a second root node breaks the page transition in App.vue -->
     <SiteBanner>
       <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
         <BouncingHeading class="h3 mb-0" text="My account" />
