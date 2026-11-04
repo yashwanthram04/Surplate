@@ -336,13 +336,6 @@ export function useHeroIntro(root) {
 
       gsap
         .timeline({ defaults: { clearProps: 'transform,opacity' } })
-        // the banner is a fridge door: it swings shut on its left hinge, lands with a small thunk,
-        // the frost on the glass melts back to the edges and light runs down the handle
-        .from(el, { rotationY: -24, transformPerspective: 1800, transformOrigin: '0% 50%', opacity: 0, duration: 0.7, ease: 'power3.in', clearProps: '' })
-        .to(el, { scaleY: 0.985, y: 3, duration: 0.07, ease: 'power1.out', clearProps: '' })
-        .to(el, { scaleY: 1, y: 0, duration: 0.5, ease: 'elastic.out(1, 0.45)' })
-        .fromTo('.hero-frost', { opacity: 1 }, { opacity: 0.45, duration: 1.8, ease: 'power2.out', clearProps: 'opacity' }, 0.55)
-        .fromTo('.hero-handle', { '--glint': '-60%' }, { '--glint': '160%', duration: 0.9, ease: 'power2.inOut', clearProps: '--glint' }, 0.7)
         .from(chars, { yPercent: -260, rotation: () => R(-70, 70), opacity: 0, duration: 1.1, ease: 'bounce.out', stagger: { each: 0.04, from: 'random' } }, 0.15)
         .from('.hero-copy > :not(h1)', { y: 34, scale: 0.85, opacity: 0, duration: 0.75, ease: 'back.out(2.2)', stagger: 0.12 }, 0.75)
         .from('.hero-rays', { scale: 0, opacity: 0, duration: 1.4, ease: 'expo.out', clearProps: 'opacity' }, 0.3)

@@ -81,58 +81,23 @@ html.fridge-route { overflow-x: clip; }
   padding: 1.3rem 1.3rem 1.8rem;
   border-radius: 2rem;
   color: #fff;
-  background: linear-gradient(135deg, #3c9c63 0%, var(--sp-green) 45%, #1e5a39 100%);
-  box-shadow: 0 26px 48px -26px rgba(38, 100, 64, 0.75), inset 0 -7px 0 rgba(0, 0, 0, 0.09);
+  /* same green as SiteBanner on the other pages */
+  background: radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.125), transparent 60%), linear-gradient(135deg, #3c9c63, var(--sp-green) 45%, #1e5a39);
+  box-shadow: 0 26px 48px -26px rgba(38, 100, 64, 0.5), inset 0 -6px 0 rgba(0, 0, 0, 0.07);
 }
-/* frosted glass: fine white grain over the green */
-.fridge-hero::before {
+/* the two faint rings on the right, as on SiteBanner */
+.fridge-hero::before, .fridge-hero::after {
   content: '';
   position: absolute;
-  inset: 0;
   z-index: -1;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .5 0 0 0 -.22'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
+  width: 260px;
+  height: 260px;
+  border: 1px solid rgba(255, 255, 255, 0.094);
+  border-radius: 50%;
   pointer-events: none;
 }
-
-/* ---- The banner as a fridge door: frost at the edges, drifting cold mist, a rubber seal and a chrome handle ---- */
-.hero-frost {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: inherit;
-  opacity: 0.45;
-  pointer-events: none;
-  background:
-    radial-gradient(70% 90% at 0% 0%, rgba(234, 247, 255, 0.6), rgba(234, 247, 255, 0) 45%),
-    radial-gradient(70% 90% at 100% 100%, rgba(234, 247, 255, 0.5), rgba(234, 247, 255, 0) 42%),
-    radial-gradient(50% 70% at 100% 0%, rgba(234, 247, 255, 0.35), rgba(234, 247, 255, 0) 38%),
-    radial-gradient(50% 70% at 0% 100%, rgba(234, 247, 255, 0.35), rgba(234, 247, 255, 0) 38%);
-}
-.hero-mist { position: absolute; z-index: 0; border-radius: 50%; pointer-events: none; filter: blur(28px); background: radial-gradient(circle, rgba(226, 245, 255, 0.3), rgba(226, 245, 255, 0) 70%); }
-.hero-mist.m1 { width: 40%; aspect-ratio: 1.7; left: -8%; bottom: -38%; animation: mist-drift 19s ease-in-out infinite alternate; }
-.hero-mist.m2 { width: 32%; aspect-ratio: 1.5; left: 36%; top: -40%; animation: mist-drift 23s ease-in-out -6s infinite alternate-reverse; }
-.hero-mist.m3 { width: 28%; aspect-ratio: 1.5; right: 16%; bottom: -34%; animation: mist-drift 16s ease-in-out -3s infinite alternate; }
-.hero-seal { position: absolute; inset: 9px; z-index: 0; border-radius: calc(2rem - 9px); border: 3px solid rgba(255, 255, 255, 0.13); box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.1); pointer-events: none; }
-.fridge-hero.is-mini .hero-seal { inset: 7px; border-width: 2px; border-radius: calc(2rem - 7px); }
-@property --glint { syntax: '<percentage>'; inherits: false; initial-value: -60%; }
-.hero-handle {
-  --glint: -60%;
-  position: absolute;
-  z-index: 3;
-  right: 13px;
-  top: 26%;
-  width: 11px;
-  height: 48%;
-  border-radius: 8px;
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0) calc(var(--glint) - 16%), rgba(255, 255, 255, 0.95) var(--glint), rgba(255, 255, 255, 0) calc(var(--glint) + 16%)),
-    linear-gradient(90deg, #8ea597, #eef5f1 42%, #c6d5cc 62%, #7c9587);
-  box-shadow: -3px 5px 10px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  animation: handle-glint 8s ease-in-out 3s infinite;
-}
-.fridge-hero.is-mini .hero-handle { right: 10px; top: 22%; height: 56%; width: 9px; }
+.fridge-hero::before { right: -80px; top: -150px; }
+.fridge-hero::after { right: 50px; bottom: -220px; }
 
 /* ---- Singapore mini-map in the banner (wide screens only) ---- */
 .hero-map-wrap { grid-area: map; display: none; position: relative; z-index: 2; min-width: 0; }
@@ -497,8 +462,6 @@ html.fridge-bar-on .map-sticky.fridge-map-wrap { top: 8.6rem; height: calc(100vh
   55% { rotate: calc(var(--r, 0deg) - 7deg); }
   80% { rotate: calc(var(--r, 0deg) + 3deg); }
 }
-@keyframes mist-drift { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(16%, -14%) scale(1.18); } }
-@keyframes handle-glint { 0%, 82% { --glint: -60%; } 100% { --glint: 160%; } }
 @keyframes hm-ping { 0% { transform: scale(1); opacity: 0.9; } 70%, 100% { transform: scale(3.4); opacity: 0; } }
 @keyframes dot-ripple { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(3.2); opacity: 0; } }
 @keyframes frost-sweep { 0% { transform: skewX(-18deg) translateX(0); } 40%, 100% { transform: skewX(-18deg) translateX(560%); } }
@@ -509,7 +472,7 @@ html.fridge-bar-on .map-sticky.fridge-map-wrap { top: 8.6rem; height: calc(100vh
   .fridge-badge.lg, .pin.fridge-pin.pin-in, .pin.fridge-pin.status-stocked::after, .live-dot::after,
   .mc-svg, .mc-eyes, .mc-food, .mc-zzz,
   .status-panel.status-low .fridge-badge.lg, .status-panel .mc.is-empty .mc-svg, .status-panel.status-stocked .panel-mood::before, .panel-mood .flake,
-  .hero-mist, .hero-handle, .hm-ping, .mg, .update-mascot { animation: none !important; }
+  .hm-ping, .mg, .update-mascot { animation: none !important; }
   .mg { cursor: default; }
   .hm-ping { display: none; }
   .map-sticky.fridge-map-wrap { transition: none; }

@@ -26,11 +26,6 @@ function poke() {
 
 <template>
   <section ref="root" class="fridge-hero" :class="{ 'is-mini': mini, 'has-map': showMap }">
-    <!-- the banner is a fridge door: frosted glass, drifting cold mist, a rubber seal and a chrome handle -->
-    <span class="hero-frost" aria-hidden="true"></span>
-    <span v-for="n in 3" :key="`m${n}`" class="hero-mist" :class="`m${n}`" aria-hidden="true"></span>
-    <span class="hero-seal" aria-hidden="true"></span>
-    <span class="hero-handle" aria-hidden="true"></span>
     <span v-for="n in 6" :key="n" class="hero-spark" :class="`s${n}`" :data-depth="1 + n * 0.25" aria-hidden="true">✦</span>
 
     <div class="hero-stage-wrap" aria-hidden="true">
