@@ -1,9 +1,4 @@
-
 import { expect, test } from './test.js';
-
-// E2E tests for the Charity Needs Board
-// Charities: post, view, edit and cancel food requests
-// Bakeries: view, pledge and withdraw food
 
 // ---------- Demo accounts ----------
 const EMAILS = {
@@ -35,8 +30,7 @@ function inTwoDays() {
   };
 }
 
-// ---------- API helpers ----------
-
+// API helpers
 // Create a need and return its unique ID
 async function createNeed(page, who, title, quantity) {
   await actAs(page, who);
@@ -76,13 +70,11 @@ async function pledgeTo(page, who, needId, quantity) {
   ).toBe(true);
 }
 
-// ---------- Page helpers ----------
-
+//  Page helpers
 // Find a specific request using its database ID
 const needCard = (page, id) =>
   page.getByTestId(`need-${id}`);
 
-// Find the bakery's quantity input inside a request card
 const pledgeInput = (card) =>
   card.locator('input[type="number"]').first();
 
@@ -94,7 +86,6 @@ async function openBoard(page, who, id) {
   await expect(needCard(page, id)).toBeVisible();
 }
 
-// Check that the browser's default confirmation popup is not used
 function watchForBrowserPopup(page) {
   const seen = { popup: false };
 
@@ -106,10 +97,7 @@ function watchForBrowserPopup(page) {
   return seen;
 }
 
-// =====================================================
 // CREATE - Posting food requests
-// =====================================================
-
 test.describe('posting a need (charity)', () => {
 
   test('a verified charity posts a need through the form and sees it on the board', async ({ page }) => {
@@ -124,7 +112,6 @@ test.describe('posting a need (charity)', () => {
     await page.getByLabel('Date needed').fill(when.date);
     await page.getByLabel('Time needed').fill(when.time);
 
-    // Submit the form and capture the server response
     const [response] = await Promise.all([
       page.waitForResponse(
         (r) =>
@@ -136,7 +123,6 @@ test.describe('posting a need (charity)', () => {
 
     expect(response.status()).toBe(201);
 
-    // Get the newly created request ID
     const createdNeed = await response.json();
     const id = createdNeed.id;
 
@@ -190,10 +176,8 @@ test.describe('posting a need (charity)', () => {
   });
 });
 
-// =====================================================
-// READ - Viewing food requests
-// =====================================================
 
+// READ - Viewing food requests
 test.describe('reading the board', () => {
 
   test('a bakery sees a need that a charity posted', async ({ page }) => {
@@ -235,10 +219,7 @@ test.describe('reading the board', () => {
   });
 });
 
-// =====================================================
 // UPDATE - Editing food requests
-// =====================================================
-
 test.describe('updating a need (charity)', () => {
 
   test('the charity changes the quantity of its own need', async ({ page }) => {
@@ -286,10 +267,8 @@ test.describe('updating a need (charity)', () => {
   });
 });
 
-// =====================================================
-// DELETE - Cancelling food requests
-// =====================================================
 
+// DELETE - Cancelling food requests
 test.describe('cancelling a need (charity)', () => {
 
   test('cancelling uses our own confirm box, and "Keep request" changes nothing', async ({ page }) => {
@@ -301,14 +280,12 @@ test.describe('cancelling a need (charity)', () => {
 
     const card = needCard(page, id);
 
-    // Open the confirmation box
     await card.getByRole('button', { name: 'Cancel request' }).click();
 
     await expect(
       page.getByText('Cancel this request?')
     ).toBeVisible();
 
-    // Keep the request
     await page.getByRole('button', { name: 'Keep request' }).click();
 
     await expect(
@@ -319,7 +296,6 @@ test.describe('cancelling a need (charity)', () => {
       card.getByRole('button', { name: 'Cancel request' })
     ).toBeVisible();
 
-    // Cancel the request
     await card.getByRole('button', { name: 'Cancel request' }).click();
 
     await page.getByRole('button', { name: 'Yes, cancel request' }).click();
@@ -336,16 +312,13 @@ test.describe('cancelling a need (charity)', () => {
   });
 });
 
-// =====================================================
-// PLEDGING - Bakery contributions
-// =====================================================
 
+// PLEDGING - Bakery contributions
 test.describe('pledging (bakery)', () => {
 
   test('a bakery pledges, then the charity sees which bakery and where to collect', async ({ page }) => {
     const id = await createNeed(page, 'hope', 'Bread', 10);
 
-    // Bakery pledges 4 units
     await openBoard(page, 'sunrise', id);
 
     const bakeryCard = needCard(page, id);
@@ -362,7 +335,6 @@ test.describe('pledging (bakery)', () => {
 
     await expect(bakeryCard).toContainText('4 of 10 pledged');
 
-    // Charity views bakery details
     await openBoard(page, 'hope', id);
 
     const charityCard = needCard(page, id);

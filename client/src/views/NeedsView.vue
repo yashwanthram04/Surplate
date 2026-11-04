@@ -22,8 +22,8 @@ const isBakery = computed(() => session.isBakery);
 // ---------- 2. Variables ----------
 // The list of needs from the server
 const needs = ref([]);
-const loading = ref(true); // true = show the loading box
-const pageError = ref(''); // error when the list fails to load
+const loading = ref(true);
+const pageError = ref('');
 
 // One red message and one green message for most actions
 const error = ref('');
@@ -31,10 +31,9 @@ const success = ref('');
 
 // Red banner for bakeries: "new charity request available"
 const newRequestCount = ref(0);
-const seenNeedIds = ref([]); // ids of needs we already saw
-let firstLoadDone = false; // we don't count the very first load
+const seenNeedIds = ref([]);
+let firstLoadDone = false;
 
-// Charity: the "post a need" form
 const dietaryOptions = ['vegetarian', 'vegan', 'halal', 'gluten-free', 'dairy-free', 'nut-free', 'egg-free'];
 
 function getToday() {
@@ -64,14 +63,14 @@ const formError = ref('');
 const successMessage = ref('');
 const serverErrors = ref({});
 
-// Charity: editing / cancelling a need
-const editingNeedId = ref(null); // which card is in edit mode
+
+const editingNeedId = ref(null);
 const editQuantities = reactive({});
 const savingNeed = ref(false);
-const needToCancel = ref(null); // the need waiting for "yes, cancel it"
+const needToCancel = ref(null);
 
 // Bakery: pledging
-const pledgeQuantities = reactive({}); // how many units typed on each card
+const pledgeQuantities = reactive({});
 const pledging = ref(false);
 
 // Bakery: my pledges
@@ -85,11 +84,7 @@ const pledgeEditError = ref('');
 const pledgeEditSuccess = ref('');
 
 // ---------- 3. Animations (GSAP) ----------
-// The bread confetti component (so we can call burst.value.celebrate())
 const burst = ref(null);
-
-// The page settles in; cards rise one after another and glide to their new places when a filter changes the list
-// (shared with the browse board, see composables/useMotion.js).
 const page = ref(null);
 const grid = ref(null);
 useEntrance(page);
@@ -107,26 +102,53 @@ function isValidQuantity(value) {
   return Number.isInteger(number) && number >= 1;
 }
 
+const ONE_DAY = 24 * 60 * 60 * 1000;
+
+function isStillShown(need) {
+  if (need.status !== 'cancelled') return true;
+
+  const cancelTime = new Date(need.cancelledAt ?? need.updatedAt);
+  if (Number.isNaN(cancelTime.getTime())) return true;
+
+  return Date.now() - cancelTime.getTime() < ONE_DAY;
+}
+
+const PIN_EMOJIS = ['🍞', '🥐', '🥖', '🥨', '🥯', '🧁'];
+
+function pinFor(need) {
+  let total = 0;
+  for (const letter of String(need.id)) {
+    total += letter.charCodeAt(0);
+  }
+
+  return {
+    emoji: PIN_EMOJIS[total % PIN_EMOJIS.length],
+    style: {
+      left: `${15 + ((total * 7) % 70)}%`, // sideways spot on the card
+      transform: `rotate(${((total * 3) % 40) - 20}deg)`, // a fixed tilt, no movement
+    },
+  };
+}
+
 async function loadNeeds() {
   pageError.value = '';
 
   try {
     const { data } = await api.get('/needs');
-    const items = data.items ?? data.needs ?? [];
+    const items = (data.items ?? data.needs ?? []).filter(isStillShown);
 
-    // Charities also ask for their OWN needs, which include the bakeries who pledged
+
     if (isCharity.value) {
       const mine = await api.get('/needs/mine');
-      const pledgesByNeed = {}; // needId -> list of pledges
+      const pledgesByNeed = {};
       for (const myNeed of mine.data.items) {
         pledgesByNeed[myNeed.id] = myNeed.pledges;
       }
       for (const need of items) {
-        need.pledges = pledgesByNeed[need.id] ?? []; // other charities' needs get an empty list
+        need.pledges = pledgesByNeed[need.id] ?? [];
       }
     }
 
-    // Count needs we have not seen before (bakeries only, never on the first load)
     const ids = items.map((need) => need.id ?? need._id);
     if (isBakery.value && firstLoadDone) {
       for (const id of ids) {
@@ -140,7 +162,7 @@ async function loadNeeds() {
 
     needs.value = items;
 
-    // Every card starts with a pledge quantity of 1
+
     for (const need of items) {
       if (pledgeQuantities[need.id] === undefined) {
         pledgeQuantities[need.id] = 1;
@@ -154,7 +176,7 @@ async function loadNeeds() {
 }
 
 async function loadMyPledges() {
-  if (!isBakery.value) return; // only bakeries have pledges
+  if (!isBakery.value) return;
   try {
     const { data } = await api.get('/needs/pledges/mine');
     myPledges.value = data.items ?? [];
@@ -170,7 +192,6 @@ async function refreshAll() {
 }
 
 // ---------- Status filter ----------
-// "Pending" = still open on the server.
 const STATUS_FILTERS = [
   { value: 'all', label: 'All' },
   { value: 'open', label: 'Pending' },
@@ -189,11 +210,11 @@ const filteredNeeds = computed(() =>
   statusFilter.value === 'all' ? needs.value : needs.value.filter((need) => need.status === statusFilter.value),
 );
 
-// Glide watches the ids (not the array), so the 30-second refresh does not replay it.
+
 const listKey = computed(() => filteredNeeds.value.map((need) => need.id).join(','));
 const cardMotion = useListMotion(grid, listKey);
 
-// Numbers for the strip at the top (open requests only, so they match what bakeries can act on).
+
 const statTiles = computed(() => {
   const open = needs.value.filter((need) => need.status === 'open');
   return [
@@ -205,23 +226,21 @@ const statTiles = computed(() => {
 const hasAside = computed(() => isCharity.value || isBakery.value);
 
 // ---------- 5. Charity actions ----------
-// Tick / untick a dietary tag
 function toggleDiet(tag) {
   const position = form.dietaryTags.indexOf(tag);
   if (position === -1) {
-    form.dietaryTags.push(tag); // not ticked yet -> add it
+    form.dietaryTags.push(tag);
   } else {
-    form.dietaryTags.splice(position, 1); // already ticked -> remove it
+    form.dietaryTags.splice(position, 1);
   }
 }
 
-// Post a new need
+
 async function createNeed() {
   formError.value = '';
   successMessage.value = '';
   serverErrors.value = {};
 
-  // Check the form first
   if (form.title.trim().length < 2) {
     formError.value = 'Please enter a title with at least 2 characters.';
     return;
@@ -248,7 +267,6 @@ async function createNeed() {
       dietaryTags: form.dietaryTags,
     });
 
-    // Clear the form
     form.title = '';
     form.description = '';
     form.quantityTarget = 1;
@@ -257,7 +275,7 @@ async function createNeed() {
     form.dietaryTags = [];
 
     successMessage.value = 'Your need has been posted!';
-    burst.value?.celebrate(); // the breads fly up
+    burst.value?.celebrate();
     await loadNeeds();
   } catch (err) {
     serverErrors.value = fieldErrors(err);
@@ -375,7 +393,7 @@ async function pledge(need) {
   }
 }
 
-// Open edit mode on one of my pledges
+
 function startEditingPledge(item) {
   editingPledgeId.value = item.id;
   editPledgeQuantity.value = item.quantity;
@@ -383,13 +401,11 @@ function startEditingPledge(item) {
   pledgeEditSuccess.value = '';
 }
 
-// Close edit mode
 function stopEditingPledge() {
   editingPledgeId.value = null;
   pledgeEditError.value = '';
 }
 
-// Save the new pledge quantity
 async function savePledgeQuantity(item) {
   pledgeEditError.value = '';
   pledgeEditSuccess.value = '';
@@ -447,7 +463,7 @@ onMounted(async () => {
   pollingTimer = window.setInterval(refreshAll, 30000);
 });
 
-// Stop the timer when we leave the page
+
 onBeforeUnmount(() => {
   window.clearInterval(pollingTimer);
 });
@@ -455,7 +471,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="page" class="needs-page">
-    <!-- The team's shared banner + heading (same look as the other pages) -->
     <div class="banner-wrap mb-3" data-enter>
       <SiteBanner icon="bi-heart-fill">
         <div class="mb-4">
@@ -495,11 +510,10 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="row g-4 align-items-start">
-        <!-- Left: the form (charities) or the bakery's own pledges -->
         <aside v-if="hasAside" class="col-12 col-lg-4" data-enter>
           <div class="needs-aside">
+          <div v-if="isCharity" class="wood-board">
             <NeedForm
-              v-if="isCharity"
               :form="form"
               :dietary-options="dietaryOptions"
               :form-error="formError"
@@ -511,6 +525,7 @@ onBeforeUnmount(() => {
               @toggle-diet="toggleDiet"
               @dismiss-success="successMessage = ''"
             />
+          </div>
 
             <MyPledges
               v-if="isBakery"
@@ -589,10 +604,15 @@ onBeforeUnmount(() => {
               v-for="(need, i) in filteredNeeds"
               :key="need.id"
               class="need-item col-12"
-              :class="hasAside ? 'col-xl-6' : 'col-md-6 col-xl-4'"
+              :class="[hasAside ? 'col-xl-6' : 'col-md-6 col-xl-4', { 'is-cancelled': need.status === 'cancelled' }]"
               :data-index="i"
               :data-testid="`need-${need.id}`"
             >
+
+              <span class="bread-pin" :style="pinFor(need).style" aria-hidden="true">
+                {{ pinFor(need).emoji }}
+              </span>
+
               <NeedCard
                 :need="need"
                 :is-charity="isCharity"
@@ -660,12 +680,12 @@ onBeforeUnmount(() => {
 .stat-value { font-size: 1.9rem; font-weight: 600; line-height: 1; color: var(--sp-green-dark); }
 .stat-label { margin-top: 0.15rem; font-size: 0.85rem; color: #6b7a70; }
 
-/* On wide screens the form (or pledges) stays in view while the requests scroll */
+
 @media (min-width: 992px) {
   .needs-aside { position: sticky; top: 5rem; max-height: calc(100vh - 6.5rem); overflow-y: auto; padding: 4px; margin: -4px; }
 }
 
-/* Status filter: pill buttons */
+
 .filter-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pill {
   padding: 0.35rem 0.95rem;
@@ -694,12 +714,75 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .bread-bounce { animation: none; }
+  .bread-pin { animation: none; }
   .stat-card,
   .pill { transition: none; }
   .stat-card:hover,
   .pill:hover { transform: none; }
 }
 
-/* Make the green banner the same width as the board */
-.banner-wrap { max-width: 1300px; margin-left: auto; margin-right: auto; }
+
+.wood-board {
+  position: relative;
+  padding: 1.2rem 1rem;
+  border: 10px solid #5a3a1e; /* dark wood frame */
+  border-radius: 1.5rem;
+
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 180px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, #c18f58, #a8763f);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35), 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+
+.need-item { position: relative; }
+.bread-pin {
+  position: absolute;
+  top: -12px;
+  z-index: 2;
+  font-size: 1.7rem;
+  line-height: 1;
+  pointer-events: none; /* clicks go through to the card */
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
+
+.need-item :deep(.need-card) {
+  position: relative;
+  color: #4a2c12; /* dark brown text */
+  background:
+    radial-gradient(circle at 20% 30%, rgba(201, 138, 69, 0.18) 0 4px, transparent 5px),
+    radial-gradient(circle at 70% 60%, rgba(201, 138, 69, 0.18) 0 5px, transparent 6px),
+    radial-gradient(circle at 40% 85%, rgba(201, 138, 69, 0.18) 0 4px, transparent 5px),
+    #fff1d0; /* soft bread crumb colour with little air holes */
+  border: 7px solid #c98a45; /* golden crust */
+  border-radius: 3rem 3rem 1.2rem 1.2rem / 2.6rem 2.6rem 1.2rem 1.2rem; /* round loaf top */
+  box-shadow: inset 0 0 0 3px #e3ad6b, 0 6px 14px rgba(90, 58, 30, 0.35);
+  transition: transform 0.2s;
+}
+.need-item :deep(.need-card:hover) { transform: translateY(-3px); }
+
+.need-item :deep(.need-card)::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 56px;
+  height: 14px;
+  transform: translateX(-50%);
+  background:
+    linear-gradient(120deg, transparent 40%, #b97a38 40% 60%, transparent 60%) 0 0 / 18px 14px repeat-x;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+@keyframes pin-sway {
+  0%, 100% { transform: rotate(calc(var(--pin-tilt) * -1)) translateY(0); }
+  50% { transform: rotate(var(--pin-tilt)) translateY(-3px); }
+}
+.need-item.is-cancelled {
+  opacity: 0.55;
+  filter: grayscale(1);
+}
+.need-item.is-cancelled :deep(.need-card:hover) { transform: none; } /* no lift on hover */
 </style>
