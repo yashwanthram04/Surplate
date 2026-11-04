@@ -45,6 +45,25 @@ sideways-scrolling audience cards. The rest of the app gets route cross-fades, s
 
 Hidden listings are hidden by the **server** (board, detail page and photo all return nothing/404), not just in the UI.
 
+### Reservations and no-show handling
+Charities and individuals reserve food for a collection slot; bakeries confirm the pickup with a code. Food that is not collected goes back on the board automatically.
+
+| Capability | Where |
+|---|---|
+| **Choose a collection slot length** (15, 30 or 60 minutes) on the listing form; the pickup window is split into slots of that length | `ListingFormView.vue`, `server/src/utils/slots.js` |
+| **Reserve food:** pick a whole quantity and a slot that has not ended (charities and individuals). Checked in the form and again on the server; stock is decremented in one MongoDB transaction, so a listing can't be oversold. Stock refreshes every 15 seconds | `ReserveView.vue`, `ReservationFields.vue`, `server/src/routes/reservations.js` |
+| **Reservation code:** every reservation gets a 6-character code, unique among that bakery's open orders | `server/src/services/reservations.js` |
+| **My reservations:** see your codes and history, **change** the quantity or slot until the slot ends, or **cancel** an open reservation (stock is restored once). Bakeries see their order history here | `ReservationsView.vue` |
+| **Orders (bakery):** type in the customer's code to find the order and **confirm the collection**; a confirmation without the matching code is rejected. Filters: **To collect** (grouped by slot), **Due soon** (released within 30 minutes, with a countdown) and **No-shows** (missed in the last 7 days), each with a count | `OrdersView.vue` |
+| **No-show handling:** a reservation not collected within **15 minutes** after its slot ends becomes `missed` and its food goes back on the listing. The server releases them every minute and before the board, orders or history are read. Staff can **release a no-show** sooner once its slot has started | `server/src/services/reservations.js`, `OrdersView.vue` |
+| **Reminders:** a banner appears when a slot starts within 30 minutes (per reservation for recipients, per slot for bakery staff), with an optional browser notification while Surplate is open. No email or push | `SlotReminders.vue` |
+| **Reliability check:** collected ÷ (collected + missed) over your last 10 finished pickups in the past 30 days. Below 80%: one open reservation at a time. Below 50% with at least 3 misses: no new reservations. Misses stop counting after 30 days, so blocked accounts recover. The score is shown on the reservation form and My reservations | `ReliabilityNotice.vue`, `ReliabilityPanel.vue` |
+
+- **Statuses:** `reserved` → `collected` | `cancelled` | `missed`. Older `expired` records are shown as `missed`.
+- Pickup times and address cannot change once stock has been reserved. Removing a listing or deleting an account cancels its pending reservations in the same transaction; collected records remain.
+- Needs a MongoDB replica set (including Atlas) for the transactions; local development and tests start their own. Endpoints are listed under [API integration](#api-integration).
+- `server/src/routes/reservations.js`, `server/src/services/reservations.js`, `server/src/utils/slots.js` · `client/src/views/{Reserve,Reservations,Orders}View.vue`
+
 ### Community fridges
 Public community fridges where anyone can take or leave food. This works **independently of listings and reservations**, so it covers people outside bakery pickup windows.
 
