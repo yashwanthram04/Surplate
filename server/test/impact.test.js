@@ -4,6 +4,7 @@ import Listing from '../src/models/Listing.js';
 import Reservation from '../src/models/Reservation.js';
 import User from '../src/models/User.js';
 import Need from '../src/models/Need.js';
+import Fridge from '../src/models/Fridge.js';
 import { canView, visibilityFilter } from '../src/utils/visibility.js';
 import { slotsFor } from '../src/utils/slots.js';
 import { boot } from './helpers.js';
@@ -217,6 +218,14 @@ test('impact charts use confirmed snapshots, Singapore dates and private recipie
   const organisation = await User.findOne({ name: 'Hope Kitchen' });
   const need = { charity: organisation._id, charityName: organisation.name, title: 'Dashboard need', quantityTarget: 10, quantityPledged: 4, neededBy: new Date(Date.now() + 86400000) };
   await Need.create([need, { ...need, status: 'fulfilled' }, { ...need, neededBy: new Date(Date.now() - 86400000) }]);
+  // The demo seed no longer includes community fridges, so this test creates its own.
+  const fridge = { openingHours: '24 hours', address: '1 Test Road', location: { type: 'Point', coordinates: [103.85, 1.3] }, createdBy: organisation._id, createdByName: organisation.name };
+  await Fridge.deleteMany({});
+  await Fridge.create([
+    { ...fridge, name: 'Impact fridge A', latestStatus: 'stocked' },
+    { ...fridge, name: 'Impact fridge B', latestStatus: 'low' },
+    { ...fridge, name: 'Impact fridge C' },
+  ]);
   const l = await listing();
   const first = await (await reserve(l, individual, 2)).json();
   const second = await (await reserve(l, charity, 1)).json();
@@ -236,7 +245,7 @@ test('impact charts use confirmed snapshots, Singapore dates and private recipie
   assert.equal(result.foods[0].name, l.itemName);
   assert.equal(result.foods[0].collectedKg, 0.75);
   assert.deepEqual(result.community.needs, { open: 1, target: 10, pledged: 4 });
-  assert.equal(result.community.fridges.reduce((sum, f) => sum + f.count, 0), 5);
+  assert.equal(result.community.fridges.reduce((sum, f) => sum + f.count, 0), 3);
   const all = await impact(individual);
   assert.equal(all.trend.interval, 'month');
   assert.equal(all.trend.platform.find((r) => r.date === '2042-01').collectedKg, 0.75);

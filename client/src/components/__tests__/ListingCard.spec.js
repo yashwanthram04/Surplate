@@ -1,7 +1,7 @@
 /* Component tests for ListingCard.vue: what a person sees on each card of the browse board.
    CountdownRing is stubbed here (it has its own spec); the integration spec mounts the two together. */
 import { mount, RouterLinkStub } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { now } from '../../composables/useNow';
 import { at, BASE, makeListing } from '../../__tests__/helpers';
 import ListingCard from '../ListingCard.vue';
@@ -17,8 +17,15 @@ const card = (overrides = {}, props = {}) =>
     global: { stubs: { RouterLink: RouterLinkStub, CountdownRing: true } },
   });
 
+// formatWindow reads the real Date, so pin it to the same moment as `now` or "Today" stops matching after 1 Nov 2026.
 beforeEach(() => {
   now.value = BASE;
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(BASE);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('ListingCard: the basics', () => {
