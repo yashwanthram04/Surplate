@@ -276,7 +276,6 @@ onBeforeUnmount(() => {
 .impact-dashboard { max-width: 1280px; margin: 0 auto; color: #263b33; }
 .impact-header { padding: 10px 0 28px; }
 .eyebrow { color: #39765c; font-size: .69rem; font-weight: 750; letter-spacing: .12em; }
-h1 { font-size: clamp(1.9rem, 4vw, 2.8rem); font-weight: 750; letter-spacing: -.045em; margin: 9px 0 12px; }
 h2 { font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: -.02em; }
 h3 { font-size: 1rem; font-weight: 700; margin: 0; }
 .impact-filter { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; background: #fff; border: 1px solid #e3e8e1; border-radius: 16px; padding: 16px 20px; margin-bottom: 12px; }

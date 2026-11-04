@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
+import BouncingHeading from './BouncingHeading.vue';
 import { burst, hop, useHeroIntro } from '../composables/useFridgeMotion';
 import FridgeHeroMap from './FridgeHeroMap.vue';
 import FridgeMascot from './FridgeMascot.vue';
@@ -11,7 +12,6 @@ const props = defineProps({
   foods: { type: Array, default: () => ['🥖', '🥗', '🍎', '🥐', '🍊'] },
   fridges: { type: Array, default: null }, // pass the fridges to show the Singapore mini-map (full banner only)
 });
-const words = computed(() => props.title.split(' ').map((w) => [...w])); // split so each letter can bounce
 const showMap = computed(() => !props.mini && !!props.fridges);
 
 const root = ref(null);
@@ -41,9 +41,7 @@ function poke() {
     <div v-if="showMap" class="hero-map-wrap" data-depth="0.35"><FridgeHeroMap :fridges="fridges" /></div>
 
     <div class="hero-copy">
-      <h1 class="fridge-title-xl" :aria-label="title">
-        <span v-for="(word, wi) in words" :key="`${title}-${wi}`" class="word" aria-hidden="true"><span v-for="(ch, ci) in word" :key="ci" class="ch"><span class="ch-in">{{ ch }}</span></span></span>
-      </h1>
+      <BouncingHeading class="fridge-title-xl" :text="title" />
       <slot />
     </div>
   </section>

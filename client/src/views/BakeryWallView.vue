@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import { api, errorMessage } from '../api';
+import BouncingHeading from '../components/BouncingHeading.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
 import CountUp from '../components/home/CountUp.vue';
 import ReliabilityGauge from '../components/ReliabilityGauge.vue';
@@ -12,7 +13,7 @@ import { useReviews } from '../stores/reviews';
 import { useSession } from '../stores/session';
 import { burst } from '../utils/confetti';
 import { TIERS, scoreTone } from '../utils/reviews';
-import { crumple, flipNote, glow, heroParallax, onceInView, scrollToEl, sway, useSmoothScroll, vMagnetic, writeIn } from '../utils/wallMotion';
+import { crumple, flipNote, glow, heroParallax, onceInView, scrollToEl, sway, useSmoothScroll, vMagnetic } from '../utils/wallMotion';
 
 // A bakery's public Thank-you Wall: its reliability, the totals, and every note recipients have left, pinned
 // ones first. The bakery's own staff see pin and reply controls on each note; a note's author can edit or delete it.
@@ -40,15 +41,12 @@ const actionError = ref('');
 const toRate = ref(0);
 const barsReady = ref(false);
 const wallEl = ref(null);
-const titleEl = ref(null);
 const heroEl = ref(null);
 const barsEl = ref(null);
-let stopWriting = () => {};
 let stopHero = () => {};
 let stopBars = () => {};
 let stopSway = () => {};
 const stopScenery = () => {
-  stopWriting();
   stopHero();
   stopBars();
 };
@@ -91,7 +89,6 @@ async function load() {
   } finally {
     loading.value = false;
     await nextTick();
-    stopWriting = writeIn(titleEl.value);
     stopHero = heroParallax(heroEl.value);
     // The rating bars grow once they are on screen (two frames later, so they start from empty).
     stopBars = onceInView(barsEl.value, () => requestAnimationFrame(() => requestAnimationFrame(() => (barsReady.value = true))));
@@ -243,7 +240,7 @@ onBeforeUnmount(() => {
         <div class="row g-4 align-items-center position-relative">
           <div class="col-12 col-md">
             <div class="section-kicker">Thank-you Wall</div>
-            <h1 ref="titleEl" class="font-display wall-title" data-testid="wall-title">{{ bakery.name }}</h1>
+            <BouncingHeading class="wall-title" data-testid="wall-title" :text="bakery.name" />
             <div v-if="bakery.address" class="text-body-secondary mb-3"><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>{{ bakery.address }}</div>
             <span class="tier-badge" :class="`tier-${reputation.tier}`" data-testid="tier"><i class="bi" :class="tier.icon" aria-hidden="true"></i> {{ tier.label }}</span>
             <div v-if="isOwner" class="d-flex flex-wrap gap-2 mt-3">
