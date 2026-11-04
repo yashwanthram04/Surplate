@@ -179,9 +179,9 @@ test.describe('a bakery posting and managing listings', () => {
   test('rejects an oversized or non-image photo', async ({ page }) => {
     await page.goto('/listings/new');
     await page.getByLabel('Photo').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
-    await expect(page.getByText('Photo must be a JPEG, PNG or WebP image.')).toBeVisible();
+    await expect(page.getByText('Photos must be JPEG, PNG or WebP images.')).toBeVisible();
     await page.getByLabel('Photo').setInputFiles({ name: 'huge.png', mimeType: 'image/png', buffer: Buffer.alloc(2 * 1024 * 1024 + 10) });
-    await expect(page.getByText('Photo must be 2 MB or smaller.')).toBeVisible();
+    await expect(page.getByText('Each photo must be 2 MB or smaller.')).toBeVisible();
   });
 
   test('edits a listing from My listings', async ({ page }) => {

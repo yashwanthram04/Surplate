@@ -9,6 +9,7 @@
     "seed": "node src/seed.js",
     "seed:reset": "node src/seed.js --reset",
     "seed:listings": "node src/seed-listings.js",
+    "seed:history": "node src/seed-history.js",
     "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {

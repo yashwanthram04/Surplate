@@ -207,5 +207,7 @@ if (process.argv[1]?.endsWith('seed.js')) {
   }
   const db = await connectDb();
   await seedDemoData({ reset });
+  // A few months of past pickups so the impact dashboard has trends. Only the CLI adds it; tests seed without it.
+  await (await import('./seed-history.js')).seedDemoHistory();
   await db.close();
 }

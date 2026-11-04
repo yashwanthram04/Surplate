@@ -8,9 +8,11 @@ import NeedForm from './NeedsForm.vue';
 import MyPledges from './MyPledges.vue';
 import NeedCard from './NeedsCard.vue';
 
+import CountUp from '../components/home/CountUp.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { gsap } from 'gsap'; // GSAP = animation library
 import { api, errorMessage, fieldErrors } from '../api';
+import { useEntrance, useListMotion } from '../composables/useMotion';
 import { useSession } from '../stores/session';
 
 const session = useSession();
@@ -86,14 +88,11 @@ const pledgeEditSuccess = ref('');
 // The bread confetti component (so we can call burst.value.celebrate())
 const burst = ref(null);
 
-// Cards slide up one after another (only on the first load)
-let cardsAnimated = false;
-async function animateCards() {
-  if (cardsAnimated || needs.value.length === 0) return;
-  cardsAnimated = true;
-  await nextTick(); // wait until Vue has drawn the cards on the page
-  gsap.from('.need-item', { opacity: 0, y: 30, duration: 0.5, stagger: 0.1 });
-}
+// The page settles in; cards rise one after another and glide to their new places when a filter changes the list
+// (shared with the browse board, see composables/useMotion.js).
+const page = ref(null);
+const grid = ref(null);
+useEntrance(page);
 
 // When the red banner appears, drop it in from the top
 watch(newRequestCount, async (count) => {
@@ -152,8 +151,6 @@ async function loadNeeds() {
   } finally {
     loading.value = false;
   }
-
-  animateCards();
 }
 
 async function loadMyPledges() {
@@ -191,6 +188,21 @@ const statusCounts = computed(() => {
 const filteredNeeds = computed(() =>
   statusFilter.value === 'all' ? needs.value : needs.value.filter((need) => need.status === statusFilter.value),
 );
+
+// Glide watches the ids (not the array), so the 30-second refresh does not replay it.
+const listKey = computed(() => filteredNeeds.value.map((need) => need.id).join(','));
+const cardMotion = useListMotion(grid, listKey);
+
+// Numbers for the strip at the top (open requests only, so they match what bakeries can act on).
+const statTiles = computed(() => {
+  const open = needs.value.filter((need) => need.status === 'open');
+  return [
+    { icon: 'bi-megaphone', bg: '#fde68a', value: open.length, label: 'open requests' },
+    { icon: 'bi-basket2', bg: '#bfdbfe', value: open.reduce((sum, need) => sum + need.quantityRemaining, 0), label: 'units still needed' },
+    { icon: 'bi-heart-fill', bg: '#bbf7d0', value: needs.value.reduce((sum, need) => sum + (need.status === 'cancelled' ? 0 : need.quantityPledged), 0), label: 'units pledged so far' },
+  ];
+});
+const hasAside = computed(() => isCharity.value || isBakery.value);
 
 // ---------- 5. Charity actions ----------
 // Tick / untick a dietary tag
@@ -442,9 +454,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="needs-page">
+  <div ref="page" class="needs-page">
     <!-- The team's shared banner + heading (same look as the other pages) -->
-    <div class="banner-wrap mb-3">
+    <div class="banner-wrap mb-3" data-enter>
       <SiteBanner icon="bi-heart-fill">
         <div class="mb-4">
           <BouncingHeading class="h3 needs-heading" text="Charity Needs Board" />
@@ -455,20 +467,19 @@ onBeforeUnmount(() => {
       </SiteBanner>
     </div>
 
-    <div class="wood-board mx-auto">
-      <NeedForm
-        v-if="isCharity"
-        :form="form"
-        :dietary-options="dietaryOptions"
-        :form-error="formError"
-        :success-message="successMessage"
-        :server-errors="serverErrors"
-        :submitting="submitting"
-        :get-today="getToday"
-        @submit="createNeed"
-        @toggle-diet="toggleDiet"
-        @dismiss-success="successMessage = ''"
-      />
+    <div class="needs-board mx-auto">
+      <!-- Live numbers -->
+      <div v-if="!loading && needs.length > 0" class="row g-3 mb-4" data-testid="needs-stats">
+        <div v-for="tile in statTiles" :key="tile.label" class="col-12 col-sm-4" data-enter>
+          <div class="stat-card">
+            <span class="stat-icon" :style="{ background: tile.bg }" aria-hidden="true"><i class="bi" :class="tile.icon"></i></span>
+            <div>
+              <div class="stat-value font-display"><CountUp :value="tile.value" :duration="1100" /></div>
+              <div class="stat-label">{{ tile.label }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Bakery only: red banner when new requests arrive -->
       <div
@@ -483,87 +494,123 @@ onBeforeUnmount(() => {
         <button class="btn-close" aria-label="Dismiss alert" @click="newRequestCount = 0"></button>
       </div>
 
-      <!-- Messages -->
-      <div v-if="pageError" class="alert alert-danger" role="alert">
-        {{ pageError }}
-        <button class="btn btn-sm btn-outline-danger ms-2" @click="loadNeeds">Retry</button>
-      </div>
-      <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
-      <div v-if="success" class="alert alert-success" role="status">🍞 {{ success }}</div>
+      <div class="row g-4 align-items-start">
+        <!-- Left: the form (charities) or the bakery's own pledges -->
+        <aside v-if="hasAside" class="col-12 col-lg-4" data-enter>
+          <div class="needs-aside">
+            <NeedForm
+              v-if="isCharity"
+              :form="form"
+              :dietary-options="dietaryOptions"
+              :form-error="formError"
+              :success-message="successMessage"
+              :server-errors="serverErrors"
+              :submitting="submitting"
+              :get-today="getToday"
+              @submit="createNeed"
+              @toggle-diet="toggleDiet"
+              @dismiss-success="successMessage = ''"
+            />
 
-      <!-- Bakery only: my pledges -->
-      <MyPledges
-        v-if="isBakery"
-        :my-pledges="myPledges"
-        :editing-pledge-id="editingPledgeId"
-        :edit-pledge-quantity="editPledgeQuantity"
-        :saving-pledge="savingPledge"
-        :pledge-edit-error="pledgeEditError"
-        :pledge-edit-success="pledgeEditSuccess"
-        :withdrawing-pledge-id="withdrawingPledgeId"
-        @update:edit-pledge-quantity="editPledgeQuantity = $event"
-        @start-edit="startEditingPledge"
-        @stop-edit="stopEditingPledge"
-        @save-quantity="savePledgeQuantity"
-        @withdraw="askWithdraw"
-      />
+            <MyPledges
+              v-if="isBakery"
+              :my-pledges="myPledges"
+              :editing-pledge-id="editingPledgeId"
+              :edit-pledge-quantity="editPledgeQuantity"
+              :saving-pledge="savingPledge"
+              :pledge-edit-error="pledgeEditError"
+              :pledge-edit-success="pledgeEditSuccess"
+              :withdrawing-pledge-id="withdrawingPledgeId"
+              @update:edit-pledge-quantity="editPledgeQuantity = $event"
+              @start-edit="startEditingPledge"
+              @stop-edit="stopEditingPledge"
+              @save-quantity="savePledgeQuantity"
+              @withdraw="askWithdraw"
+            />
+          </div>
+        </aside>
 
-      <!-- Loading -->
-      <div v-if="loading" class="bg-white border rounded-4 p-5 text-center my-3">
-        <div class="bread-bounce bread-huge">🍞</div>
-        <p class="text-body-secondary mb-0">Baking your requests…</p>
-      </div>
+        <!-- Right: the requests -->
+        <section class="col-12" :class="{ 'col-lg-8': hasAside }" aria-label="Food requests">
+          <!-- Messages -->
+          <div v-if="pageError" class="alert alert-danger" role="alert">
+            {{ pageError }}
+            <button class="btn btn-sm btn-outline-danger ms-2" @click="loadNeeds">Retry</button>
+          </div>
+          <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
+          <div v-if="success" class="alert alert-success" role="status">🍞 {{ success }}</div>
 
-      <!-- No needs yet -->
-      <div v-else-if="!pageError && needs.length === 0" class="bg-white border rounded-4 p-5 text-center">
-        <div class="bread-bounce bread-huge">🥐</div>
-        <h2 class="h5">No open requests yet</h2>
-        <p class="text-body-secondary mb-0">New charity requests will appear here.</p>
-      </div>
+          <!-- Loading -->
+          <div v-if="loading" class="state-card">
+            <div class="bread-bounce bread-huge">🍞</div>
+            <p class="text-body-secondary mb-0">Baking your requests…</p>
+          </div>
 
-      <!-- Status filter -->
-      <div v-else-if="needs.length > 0" class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Filter requests by status">
-        <button
-          v-for="f in STATUS_FILTERS"
-          :key="f.value"
-          type="button"
-          class="btn btn-sm"
-          :class="statusFilter === f.value ? 'btn-dark' : 'btn-outline-dark bg-white'"
-          :aria-pressed="statusFilter === f.value"
-          :data-testid="`needs-filter-${f.value}`"
-          @click="statusFilter = f.value"
-        >
-          {{ f.label }} ({{ statusCounts[f.value] }})
-        </button>
-      </div>
+          <!-- No needs yet -->
+          <div v-else-if="!pageError && needs.length === 0" class="state-card">
+            <div class="bread-bounce bread-huge">🥐</div>
+            <h2 class="h5">No open requests yet</h2>
+            <p class="text-body-secondary mb-0">New charity requests will appear here.</p>
+          </div>
 
-      <div v-if="!loading && needs.length > 0 && filteredNeeds.length === 0" class="bg-white border rounded-4 p-4 text-center">
-        <p class="text-body-secondary mb-0">No {{ STATUS_FILTERS.find((f) => f.value === statusFilter).label.toLowerCase() }} requests.</p>
-      </div>
+          <!-- Status filter -->
+          <div v-else-if="needs.length > 0" class="filter-pills mb-3" role="group" aria-label="Filter requests by status">
+            <button
+              v-for="f in STATUS_FILTERS"
+              :key="f.value"
+              type="button"
+              class="pill"
+              :class="{ 'is-active': statusFilter === f.value }"
+              :aria-pressed="statusFilter === f.value"
+              :data-testid="`needs-filter-${f.value}`"
+              @click="statusFilter = f.value"
+            >
+              {{ f.label }} ({{ statusCounts[f.value] }})
+            </button>
+          </div>
 
-      <!-- The list of need cards -->
-      <div v-if="!loading && needs.length > 0" class="row g-3">
-        <div
-            v-for="need in filteredNeeds"
-            :key="need.id"
-            class="need-item col-12 col-lg-6"
-            :data-testid="`need-${need.id}`">
-            <NeedCard
-            :need="need"
-            :is-charity="isCharity"
-            :is-bakery="isBakery"
-            :editing-need-id="editingNeedId"
-            :edit-quantities="editQuantities"
-            :saving-need="savingNeed"
-            :pledge-quantities="pledgeQuantities"
-            :pledging="pledging"
-            @start-edit="startEditing"
-            @stop-edit="stopEditing"
-            @save-quantity="saveQuantity"
-            @cancel-need="cancelNeed"
-            @pledge="pledge"
-          />
-        </div>
+          <div v-if="!loading && needs.length > 0 && filteredNeeds.length === 0" class="state-card">
+            <p class="text-body-secondary mb-0">No {{ STATUS_FILTERS.find((f) => f.value === statusFilter).label.toLowerCase() }} requests.</p>
+          </div>
+
+          <!-- The list of need cards: they rise in one after another and glide when a filter changes the list -->
+          <TransitionGroup
+            v-if="!loading && needs.length > 0"
+            ref="grid"
+            tag="div"
+            :css="false"
+            appear
+            class="row g-3 position-relative"
+            @before-enter="cardMotion.onBeforeEnter"
+            @enter="cardMotion.onEnter"
+            @leave="cardMotion.onLeave"
+          >
+            <div
+              v-for="(need, i) in filteredNeeds"
+              :key="need.id"
+              class="need-item col-12"
+              :class="hasAside ? 'col-xl-6' : 'col-md-6 col-xl-4'"
+              :data-index="i"
+              :data-testid="`need-${need.id}`"
+            >
+              <NeedCard
+                :need="need"
+                :is-charity="isCharity"
+                :is-bakery="isBakery"
+                :editing-need-id="editingNeedId"
+                :edit-quantities="editQuantities"
+                :saving-need="savingNeed"
+                :pledge-quantities="pledgeQuantities"
+                :pledging="pledging"
+                @start-edit="startEditing"
+                @stop-edit="stopEditing"
+                @save-quantity="saveQuantity"
+                @cancel-need="cancelNeed"
+                @pledge="pledge"
+              />
+            </div>
+          </TransitionGroup>
+        </section>
       </div>
     </div>
 
@@ -593,34 +640,53 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* ===== The wooden board ===== */
-.wood-board {
-  max-width: 1300px;
-  position: relative;
-  z-index: 1; /* the board sits ON TOP of the floating breads */
-  padding: 2rem 1.5rem;
-  border: 14px solid #5a3a1e; /* dark wood frame */
-  border-radius: 1.5rem;
-  /* Layers: plank lines, then wood grain, then the brown wood colour */
-  background:
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 180px),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 7px),
-    linear-gradient(180deg, #c18f58, #a8763f);
-  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35), 0 10px 25px rgba(0, 0, 0, 0.3);
+.needs-board { max-width: 1300px; }
+
+/* The strip of live numbers */
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  height: 100%;
+  padding: 1rem 1.2rem;
+  background: #fff;
+  border: 1px solid #e8e4da;
+  border-radius: 1.1rem;
+  box-shadow: 0 1px 2px rgba(40, 60, 40, 0.04);
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -14px rgba(40, 60, 40, 0.25); }
+.stat-icon { display: grid; place-items: center; width: 2.8rem; height: 2.8rem; border-radius: 0.9rem; font-size: 1.2rem; color: #1f3d2b; }
+.stat-value { font-size: 1.9rem; font-weight: 600; line-height: 1; color: var(--sp-green-dark); }
+.stat-label { margin-top: 0.15rem; font-size: 0.85rem; color: #6b7a70; }
+
+/* On wide screens the form (or pledges) stays in view while the requests scroll */
+@media (min-width: 992px) {
+  .needs-aside { position: sticky; top: 5rem; max-height: calc(100vh - 6.5rem); overflow-y: auto; padding: 4px; margin: -4px; }
 }
 
-/* Each card is tilted a little: odd ones left, even ones right */
-.need-item:nth-child(odd) :deep(.need-card) { rotate: -1deg; }
-.need-item:nth-child(even) :deep(.need-card) { rotate: 1deg; }
+/* Status filter: pill buttons */
+.filter-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pill {
+  padding: 0.35rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #3a4a40;
+  background: #fff;
+  border: 1px solid #ddd8cb;
+  border-radius: 99px;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s;
+}
+.pill:hover { border-color: var(--sp-green); transform: translateY(-1px); }
+.pill.is-active { color: #fff; background: var(--sp-green); border-color: var(--sp-green); }
+.pill:focus-visible { outline: 3px solid var(--bs-focus-ring-color); outline-offset: 1px; }
+
+/* Loading and empty boxes */
+.state-card { padding: 2.5rem 1rem; margin-bottom: 1rem; text-align: center; background: #fff; border: 1px solid #e8e4da; border-radius: 1.1rem; }
 
 /* The bread (loading and empty boxes) hops up and down */
 .bread-huge { font-size: 4rem; }
-
-.bread-bounce {
-  display: inline-block;
-  animation: hop 1.2s ease-in-out infinite;
-}
-
+.bread-bounce { display: inline-block; animation: hop 1.2s ease-in-out infinite; }
 @keyframes hop {
   0%, 100% { transform: translateY(0) rotate(-4deg); }
   50% { transform: translateY(-10px) rotate(4deg); }
@@ -628,17 +694,12 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .bread-bounce { animation: none; }
+  .stat-card,
+  .pill { transition: none; }
+  .stat-card:hover,
+  .pill:hover { transform: none; }
 }
 
-/* Smaller frame on phones */
-@media (max-width: 576px) {
-  .wood-board { border-width: 8px; padding: 1.5rem 0.75rem; }
-}
-
-/* Make the green banner the same width as the wooden board */
-.banner-wrap {
-  max-width: 1300px;
-  margin-left: auto;
-  margin-right: auto;
-}
+/* Make the green banner the same width as the board */
+.banner-wrap { max-width: 1300px; margin-left: auto; margin-right: auto; }
 </style>

@@ -14,16 +14,14 @@ const emit = defineEmits(['submit', 'toggle-diet', 'dismiss-success']);
 </script>
 
 <template>
-  <div class="form-paper position-relative rounded-4 p-3 p-md-4 mb-4">
-    <!-- The bread that pins the form to the board -->
-    <span class="form-pin">🍞</span>
-
-    <h2 class="h5">
-      <span class="bread-hop">🥖</span> Post a food request
-    </h2>
-    <p class="small text-body-secondary">
-      Tell bakeries what your organisation needs and when you need it.
-    </p>
+  <div class="form-paper">
+    <div class="form-head">
+      <span class="form-icon" aria-hidden="true">🥖</span>
+      <div>
+        <h2 class="h5 mb-0">Post a food request</h2>
+        <p class="small text-body-secondary mb-0">Tell bakeries what you need and when.</p>
+      </div>
+    </div>
 
     <div v-if="formError" class="alert alert-danger" role="alert">
       {{ formError }}
@@ -124,86 +122,60 @@ const emit = defineEmits(['submit', 'toggle-diet', 'dismiss-success']);
 
 <style scoped>
 .form-paper {
-  background: #fff8ec;
-  border: 2px solid #f0d9b5;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-  animation: slide-in 0.6s ease-out;
+  position: relative;
+  padding: 1.25rem;
+  background: #fff;
+  border: 1px solid #e8e4da;
+  border-radius: 1.1rem;
+  box-shadow: 0 1px 2px rgba(40, 60, 40, 0.04);
+  overflow: hidden;
 }
-
-@keyframes slide-in {
-  from { opacity: 0; transform: translateY(25px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.form-pin {
+.form-paper::before {
+  content: '';
   position: absolute;
-  top: -18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 2.2rem;
-  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.4));
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--sp-green), #6cc08b);
 }
 
-.bread-hop {
-  display: inline-block;
-  animation: hop 1.2s ease-in-out infinite;
+.form-head { display: flex; align-items: center; gap: 0.8rem; margin: 0.2rem 0 1.1rem; }
+.form-icon {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.8rem;
+  font-size: 1.4rem;
+  background: var(--sp-green-soft);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+.form-paper:hover .form-icon { transform: rotate(-10deg) scale(1.1); }
 
-@keyframes hop {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-5px) rotate(4deg); }
-}
+.form-control { transition: box-shadow 0.2s, border-color 0.2s; }
 
-.form-control {
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-.form-control:focus {
-  border-color: #e0a64b;
-  box-shadow: 0 0 0 0.25rem rgba(224, 166, 75, 0.35);
-}
-
-.tag-chip {
-  transition: transform 0.15s;
-}
-
-.tag-chip:hover {
-  transform: translateY(-2px) scale(1.05);
-}
-
-.tag-chip.btn-primary {
-  animation: pop 0.3s ease-out;
-}
-
+.tag-chip { transition: transform 0.15s; }
+.tag-chip:hover { transform: translateY(-2px); }
+.tag-chip.btn-primary { animation: pop 0.3s ease-out; }
 @keyframes pop {
   0% { transform: scale(0.85); }
-  60% { transform: scale(1.15); }
+  60% { transform: scale(1.12); }
   100% { transform: scale(1); }
 }
 
-/* The Post button wiggles when you hover over it */
-.post-btn:hover:not(:disabled) {
-  animation: wiggle 0.4s ease-in-out;
-}
+.post-btn { transition: transform 0.15s, box-shadow 0.15s; }
+.post-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 16px -8px rgba(38, 100, 64, 0.6); }
 
-@keyframes wiggle {
-  0%, 100% { transform: rotate(0); }
-  25% { transform: rotate(-4deg); }
-  75% { transform: rotate(4deg); }
-}
-
-.alert-success {
-  animation: pop 0.4s ease-out;
-}
+.alert-success { animation: pop 0.4s ease-out; }
 
 /* People who turn off animations in their computer settings get a still form */
 @media (prefers-reduced-motion: reduce) {
-  .form-paper,
-  .bread-hop,
   .tag-chip.btn-primary,
-  .post-btn:hover,
-  .alert-success {
-    animation: none;
-  }
+  .alert-success { animation: none; }
+  .form-icon,
+  .tag-chip,
+  .post-btn { transition: none; }
+  .form-paper:hover .form-icon,
+  .tag-chip:hover,
+  .post-btn:hover:not(:disabled) { transform: none; }
 }
 </style>

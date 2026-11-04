@@ -195,10 +195,10 @@ describe('BrowseView: map link', () => {
 describe('BrowseView: the "you are seeing part of the board" note', () => {
   const note = (w) => w.find('[data-testid="partial-view-note"]');
 
-  it('invites visitors to register a charity', async () => {
+  it('tells visitors that verified charities get priority access', async () => {
     const w = await open();
-    expect(note(w).text()).toContain('Verified charities see more');
-    expect(note(w).findComponent(RouterLinkStub).props('to')).toBe('/register?role=charity');
+    expect(note(w).text()).toContain('Verified charities get priority access.');
+    expect(note(w).text()).not.toContain('pending');
   });
 
   it('tells a charity that is still waiting for approval', async () => {
@@ -207,7 +207,7 @@ describe('BrowseView: the "you are seeing part of the board" note', () => {
     wrapper = mountBrowse(pinia);
     useSession(pinia).user = { role: 'charity', verification: { status: 'pending' } };
     await settle();
-    expect(note(wrapper).text()).toContain('Your charity is awaiting verification.');
+    expect(note(wrapper).text()).toContain('Your verification is pending.');
   });
 
   it('is hidden for a verified charity, who already sees everything', async () => {

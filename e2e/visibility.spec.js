@@ -27,8 +27,7 @@ test.describe('who sees what on the board', () => {
     await page.goto('/browse');
     for (const name of SHARED) await expect(card(page, name)).toBeVisible();
     for (const name of HIDDEN) await expect(card(page, name)).toHaveCount(0);
-    await expect(page.getByTestId('partial-view-note')).toContainText('Verified charities see more');
-    await expect(page.getByRole('link', { name: 'Register a charity' })).toBeVisible();
+    await expect(page.getByTestId('partial-view-note')).toContainText('Verified charities get priority access');
   });
 
   test('an individual sees the same as a guest', async ({ page }) => {
@@ -52,7 +51,7 @@ test.describe('who sees what on the board', () => {
     await page.goto('/browse');
     await expect(card(page, 'Pandan buns')).toBeVisible();
     await expect(card(page, 'Curry puffs')).toHaveCount(0);
-    await expect(page.getByTestId('partial-view-note')).toContainText('awaiting verification');
+    await expect(page.getByTestId('partial-view-note')).toContainText('Your verification is pending');
   });
 
   test('opening a charity-only listing by its link shows "no longer available" to everyone else', async ({ page, browser }) => {

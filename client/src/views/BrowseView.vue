@@ -15,6 +15,7 @@ const session = useSession();
 const filters = ref({ q: '', dietary: [], avoid: [], openNow: false, endingSoon: false, near: null, radiusKm: 5, sort: 'ending' });
 const items = ref([]);
 const loading = ref(true);
+const busy = ref(false); // true from a filter change until its results arrive: the list dims so the change feels acknowledged
 const error = ref('');
 const hoverId = ref(null);
 const view = ref('list'); // below the lg breakpoint the page shows either the list or the map
@@ -57,7 +58,7 @@ async function load() {
     if (mine !== requestId) return;
     error.value = errorMessage(err);
   } finally {
-    if (mine === requestId) loading.value = false;
+    if (mine === requestId) loading.value = busy.value = false;
   }
 }
 
@@ -65,6 +66,7 @@ let debounce = null;
 watch(
   filters,
   () => {
+    busy.value = true;
     clearTimeout(debounce);
     debounce = setTimeout(load, 250);
   },
@@ -110,7 +112,7 @@ onBeforeUnmount(() => {
 
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="small text-body-secondary" aria-live="polite" data-testid="result-count">
-          <template v-if="!loading">{{ visible.length }} {{ visible.length === 1 ? 'listing' : 'listings' }} available</template>
+          <template v-if="!loading"><Transition name="count" mode="out-in"><span :key="visible.length" class="count-num">{{ visible.length }}</span></Transition> {{ visible.length === 1 ? 'listing' : 'listings' }} available</template>
         </div>
       </div>
 
@@ -132,7 +134,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- cards rise in one after another, and glide to their new place when a filter changes the list (see useListMotion) -->
-      <TransitionGroup v-else ref="grid" tag="div" :css="false" appear class="row g-3 position-relative" @before-enter="cardMotion.onBeforeEnter" @enter="cardMotion.onEnter" @leave="cardMotion.onLeave">
+      <TransitionGroup v-else ref="grid" tag="div" :css="false" appear class="row g-3 position-relative results" :class="{ 'is-busy': busy }" @before-enter="cardMotion.onBeforeEnter" @enter="cardMotion.onEnter" @leave="cardMotion.onLeave">
         <div v-for="(l, i) in visible" :key="l.id" class="col-12 col-md-6 col-xxl-4" :data-index="i">
           <ListingCard :listing="l" :highlighted="hoverId === l.id" @hover="hoverId = $event" />
         </div>

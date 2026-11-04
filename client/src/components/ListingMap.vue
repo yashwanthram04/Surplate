@@ -20,6 +20,7 @@ let map = null;
 let pinLayer = null;
 let centerLayer = null;
 let lastFitKey = '';
+let lastDrawKey = '';
 const pins = new Map(); // listing id -> marker element, for highlighting
 
 const ONEMAP_ATTRIBUTION =
@@ -62,10 +63,15 @@ function drawListings() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(l);
   }
+  // Pins drop in one after another, but only when the set of listings changed: the 15 s refresh redraws silently.
+  const drawKey = props.listings.map((l) => l.id).sort().join(',');
+  const dropIn = drawKey !== lastDrawKey;
+  lastDrawKey = drawKey;
+  let n = 0;
   for (const group of groups.values()) {
     const icon = L.divIcon({
       className: '',
-      html: `<div class="pin"><span>${group.length > 1 ? group.length : ''}</span></div>`,
+      html: `<div class="pin${dropIn ? ' pin-drop' : ''}" style="--i:${Math.min(n++, 10)}"><span>${group.length > 1 ? group.length : ''}</span></div>`,
       iconSize: [34, 34],
       iconAnchor: [17, 34],
       popupAnchor: [0, -32],
@@ -129,7 +135,9 @@ onMounted(() => {
 });
 onBeforeUnmount(() => map?.remove());
 
-watch(() => props.listings, () => map && drawListings());
+// Redraw only when a pin would actually change (which listings, and where). The parent hands over a fresh array on every
+// clock tick and refresh; redrawing each time would restart the pin animation and flicker the pins.
+watch(() => props.listings.map((l) => `${l.id}@${l.lat},${l.lng}`).join('|'), () => map && drawListings());
 watch(() => [props.center, props.radiusKm], () => {
   if (!map) return;
   drawCenter();

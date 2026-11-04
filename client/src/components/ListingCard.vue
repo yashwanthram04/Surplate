@@ -1,4 +1,5 @@
 <script setup>
+import { onMounted, ref } from 'vue';
 import { now } from '../composables/useNow';
 import { RouterLink } from 'vue-router';
 import { formatWindow } from '../utils/time';
@@ -9,6 +10,13 @@ defineProps({
   highlighted: Boolean,
 });
 defineEmits(['hover']);
+
+// The photo fades in once it has loaded (a cached photo shows at once).
+const photo = ref(null);
+const loaded = ref(false);
+onMounted(() => {
+  if (photo.value?.complete) loaded.value = true;
+});
 </script>
 
 <template>
@@ -22,7 +30,7 @@ defineEmits(['hover']);
     @focusout="$emit('hover', null)"
   >
     <div class="position-relative">
-      <img v-if="listing.photoUrl" class="photo" :src="listing.photoUrl" :alt="`Photo of ${listing.itemName}`" loading="lazy" />
+      <img v-if="listing.photoUrl" ref="photo" class="photo" :class="{ 'is-loaded': loaded }" :src="listing.photoUrl" :alt="`Photo of ${listing.itemName}`" loading="lazy" @load="loaded = true" @error="loaded = true" />
       <div v-else class="photo-placeholder" aria-hidden="true">🥖</div>
       <div class="ring-badge"><CountdownRing :start="listing.pickupStart" :end="listing.pickupEnd" :size="54" /></div>
     </div>
