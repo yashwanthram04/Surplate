@@ -95,6 +95,7 @@ export function heroParallax(hero) {
   useScrollTrigger();
   const layers = gsap.utils.toArray('[data-depth]', hero);
   const ctx = gsap.context(() => {
+    gsap.from('.text-body-secondary', { y: 34, scale: 0.85, opacity: 0, duration: 0.75, ease: 'back.out(2.2)', stagger: 0.12, delay: 0.75, clearProps: 'transform,opacity' });
     const scroll = { trigger: hero, start: 'top top', end: 'bottom top', scrub: 0.6 };
     layers.forEach((layer) => gsap.to(layer, { yPercent: Number(layer.dataset.depth) * 45, ease: 'none', scrollTrigger: scroll }));
     gsap.to('[data-hero-gauge]', { rotate: 14, scale: 0.9, ease: 'none', scrollTrigger: scroll });

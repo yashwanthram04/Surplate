@@ -31,7 +31,7 @@ h1, h2, h3 { font-family: var(--sp-display); }
   box-shadow: 0 26px 48px -26px #26644080;
 }
 .site-illustrated-banner h1 { color: #fff; }
-.site-illustrated-banner .text-body-secondary { color: #ffffffd9 !important; }
+.site-illustrated-banner .text-body-secondary { font-family: var(--bs-body-font-family); font-size: 1.05rem; font-weight: 400; line-height: 1.5; max-width: 46ch; color: #ffffffeb !important; }
 .site-illustrated-banner .section-kicker { color: #ffdf98; }
 
 /* Bootstrap's "primary" recoloured to the Surplate green */

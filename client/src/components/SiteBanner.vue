@@ -1,13 +1,26 @@
 <script setup>
+import { gsap } from 'gsap';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
 defineProps({
   compact: Boolean,
   icon: { type: String, default: 'bi-heart-fill' },
 });
+const copy = ref(null);
+let context;
+onMounted(() => {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  context = gsap.context(() => {
+    const descriptions = copy.value.querySelectorAll('p, .text-body-secondary');
+    if (descriptions.length) gsap.from(descriptions, { y: 34, scale: 0.85, opacity: 0, duration: 0.75, ease: 'back.out(2.2)', stagger: 0.12, delay: 0.75, clearProps: 'transform,opacity' });
+  }, copy.value);
+});
+onBeforeUnmount(() => context?.revert());
 </script>
 
 <template>
   <header class="community-banner" :class="{ 'is-compact': compact }">
-    <div class="banner-copy"><slot /></div>
+    <div ref="copy" class="banner-copy"><slot /></div>
     <div class="banner-art" aria-hidden="true">
       <span class="food bread">🥖</span>
       <span class="food apple">🍎</span>
@@ -47,8 +60,7 @@ defineProps({
 .banner-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .banner-copy :deep(h1) { font-family: 'Fredoka', system-ui, sans-serif; color: #fff; }
 .banner-copy :deep(h1) { overflow-wrap: anywhere; }
-.banner-copy :deep(p) { color: #ffffffd9 !important; overflow-wrap: anywhere; }
-.banner-copy :deep(.text-body-secondary) { color: #ffffffd9 !important; }
+.banner-copy :deep(p), .banner-copy :deep(.text-body-secondary) { font-family: var(--bs-body-font-family); font-size: 1.05rem; font-weight: 400; line-height: 1.5; color: #ffffffeb !important; max-width: 46ch; overflow-wrap: anywhere; }
 .banner-copy :deep(a:not(.btn)) { color: #ffdf98; }
 .banner-copy :deep(p:last-child) { margin-bottom: 0; }
 .banner-copy :deep(.eyebrow) { color: #ffdf98; }

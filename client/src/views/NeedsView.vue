@@ -407,31 +407,10 @@ async function confirmWithdraw() {
   }
 }
 
-// ---------- Heading hover ----------
-function splitHeadingLetters() {
-  const words = document.querySelectorAll('.needs-heading .title-word');
-  words.forEach((word) => {
-    const text = word.textContent; // e.g. "Charity "
-    word.textContent = ''; // empty the word, then add it back letter by letter
-    for (const character of text) {
-      if (character === ' ') {
-        word.append(' '); // a space stays a plain space
-      } else {
-        const letter = document.createElement('span');
-        letter.className = 'ch-in';
-        letter.textContent = character;
-        word.append(letter);
-      }
-    }
-  });
-}
-
 // ---------- 7. Auto refresh every 30 seconds ----------
 let pollingTimer = null;
 
 onMounted(async () => {
-  splitHeadingLetters();
-
   await refreshAll();
   pollingTimer = window.setInterval(refreshAll, 30000);
 });
@@ -573,40 +552,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap');
-
-
-.needs-heading,
-.needs-heading :deep(*) {
-  font-family: var(--fc-display, 'Fredoka', 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.needs-heading {
-  /* the fridge page's smaller banner size (its big hero uses clamp(2.5rem, 6vw, 4.4rem)) */
-  font-size: clamp(1.8rem, 4.2vw, 2.8rem);
-}
-
-.needs-heading :deep(.title-word) {
-  transition: translate 0.2s ease, scale 0.2s ease;
-}
-
-.needs-heading :deep(.title-word:hover) {
-  translate: 0 -6px;
-  scale: 1.08;
-}
-
-/* Hover over a LETTER: that letter jumps and grows even more */
-.needs-heading :deep(.ch-in) {
-  display: inline-block; /* a letter must be inline-block to be able to move */
-  transition: transform 0.2s ease;
-}
-
-.needs-heading :deep(.ch-in:hover) {
-  transform: translateY(-10px) scale(1.3);
-}
-
 /* ===== The wooden board ===== */
 .wood-board {
   max-width: 1300px;

@@ -331,22 +331,15 @@ export function useHeroIntro(root) {
     const el = root.value;
     if (prefersReducedMotion() || !el) return;
     ctx = gsap.context(() => {
-      const chars = gsap.utils.toArray('.ch');
       const R = gsap.utils.random;
 
       gsap
         .timeline({ defaults: { clearProps: 'transform,opacity' } })
-        .from(chars, { yPercent: -260, rotation: () => R(-70, 70), opacity: 0, duration: 1.1, ease: 'bounce.out', stagger: { each: 0.04, from: 'random' } }, 0.15)
         .from('.hero-copy > :not(h1)', { y: 34, scale: 0.85, opacity: 0, duration: 0.75, ease: 'back.out(2.2)', stagger: 0.12 }, 0.75)
         .from('.hero-rays', { scale: 0, opacity: 0, duration: 1.4, ease: 'expo.out', clearProps: 'opacity' }, 0.3)
         .from('.hero-mascot-pop', { yPercent: 150, scaleX: 0.6, scaleY: 1.5, opacity: 0, duration: 1.3, ease: 'elastic.out(1, 0.5)' }, 0.45)
         .from('.orb-in', { scale: 0, duration: 0.7, ease: 'back.out(3)', stagger: 0.08, clearProps: 'opacity' }, 0.95)
         .from('.hero-spark', { scale: 0, duration: 0.5, ease: 'back.out(3)', stagger: 0.06, clearProps: 'opacity' }, 0.6);
-
-      // the letters ripple like a wave every few seconds
-      gsap
-        .timeline({ repeat: -1, repeatDelay: 3.8, delay: 2.8 })
-        .to(chars, { y: -18, rotation: () => R(-12, 12), duration: 0.22, ease: 'power2.out', stagger: 0.045, yoyo: true, repeat: 1 });
 
       // food circles the mascot (each item turns back the other way so it stays upright) and bobs
       gsap.to('.hero-orbit', { rotation: 360, duration: 24, ease: 'none', repeat: -1 });
@@ -357,16 +350,6 @@ export function useHeroIntro(root) {
       // sparkles twinkle (once the entrance is over)
       gsap.utils.toArray('.hero-spark').forEach((s) => {
         gsap.to(s, { scale: 0.35, rotation: 90, opacity: 0.35, duration: R(0.8, 1.6), ease: 'sine.inOut', yoyo: true, repeat: -1, delay: 1.5 + R(0, 1.5) });
-      });
-
-      // hovering a letter makes it jump and flash yellow (on .ch-in, so it never fights the ripple on .ch)
-      gsap.utils.toArray('.ch-in').forEach((c) => {
-        c.addEventListener('mouseenter', () => {
-          gsap
-            .timeline({ overwrite: 'auto' })
-            .to(c, { y: -22, scale: 1.3, rotation: R(-20, 20), color: '#ffd66b', duration: 0.18, ease: 'power2.out' })
-            .to(c, { y: 0, scale: 1, rotation: 0, color: '#fff', duration: 0.7, ease: 'elastic.out(1, 0.35)' });
-        });
       });
 
       // scrolling past: the words drift up and fade, the mascot sinks and spins away
