@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 
 // Keep these lists in sync with client/src/utils/fridge.js
 export const FRIDGE_STATUSES = ['stocked', 'low', 'empty'];
+// Statuses that mean food was left inside: these are the ones whose food can go stale.
+export const FOOD_STATUSES = ['stocked', 'low'];
+// A stocked/low status with no update for this long may mean old food: users are warned and admins are asked to check.
+export const FOOD_STALE_MS = 48 * 60 * 60 * 1000;
+// An admin's "I'm checking this" shows for this long unless someone posts an update first.
+export const CHECK_CLAIM_MS = 24 * 60 * 60 * 1000;
 
 const fridgeSchema = new mongoose.Schema(
   {
@@ -30,6 +36,11 @@ const fridgeSchema = new mongoose.Schema(
     latestStatus: { type: String, enum: [...FRIDGE_STATUSES, 'unknown'], default: 'unknown' },
     latestUpdateAt: Date,
     latestNote: { type: String, default: '' },
+
+    // Set when an admin says they are going to check a stale fridge. Only counts if newer than latestUpdateAt.
+    checkingBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    checkingByName: String,
+    checkingAt: Date,
 
     // Soft delete, like listings: the update history and spoiled reports stay in the database.
     status: { type: String, enum: ['active', 'removed'], default: 'active' },

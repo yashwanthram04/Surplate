@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { vTilt } from '../composables/useFridgeMotion';
 import { now } from '../composables/useNow';
-import { isStale, timeAgo } from '../utils/fridge';
+import { displayStatus, isStale, timeAgo } from '../utils/fridge';
 import FridgeMascot from './FridgeMascot.vue';
 import FridgeStatusBadge from './FridgeStatusBadge.vue';
 
@@ -20,6 +20,7 @@ onMounted(() => {
   if (photo.value?.complete) loaded.value = true;
 });
 
+const shown = computed(() => displayStatus(props.fridge));
 const isLive =computed(() => !!props.fridge.latestUpdateAt && now.value - new Date(props.fridge.latestUpdateAt).getTime() < 60 * 60 * 1000);
 </script>
 
@@ -27,7 +28,7 @@ const isLive =computed(() => !!props.fridge.latestUpdateAt && now.value - new Da
   <article
     v-tilt
     class="listing-card fridge-card h-100 d-flex flex-column position-relative"
-    :class="[`status-${fridge.latestStatus || 'unknown'}`, { 'is-highlighted': highlighted }]"
+    :class="[`status-${shown}`, { 'is-highlighted': highlighted }]"
     data-testid="fridge-card"
     @mouseenter="$emit('hover', fridge.id)"
     @mouseleave="$emit('hover', null)"
@@ -36,8 +37,8 @@ const isLive =computed(() => !!props.fridge.latestUpdateAt && now.value - new Da
   >
     <div class="fridge-card-media">
       <img v-if="fridge.photoUrl" ref="photo" class="photo" :class="{ 'is-loaded': loaded }" :src="fridge.photoUrl" :alt="`Photo of ${fridge.name}`" loading="lazy" @load="loaded = true" @error="loaded = true" />
-      <div v-else class="photo-placeholder" aria-hidden="true"><FridgeMascot :mood="fridge.latestStatus || 'unknown'" :size="104" /></div>
-      <FridgeStatusBadge class="card-status-chip" :status="fridge.latestStatus" />
+      <div v-else class="photo-placeholder" aria-hidden="true"><FridgeMascot :mood="shown" :size="104" /></div>
+      <FridgeStatusBadge class="card-status-chip" :status="shown" />
     </div>
 
     <div class="p-3 d-flex flex-column flex-grow-1">
@@ -48,8 +49,10 @@ const isLive =computed(() => !!props.fridge.latestUpdateAt && now.value - new Da
         Community fridge<template v-if="fridge.distanceKm != null"> · {{ fridge.distanceKm }} km away</template>
       </div>
 
-      <div v-if="fridge.openSpoiledReports" class="d-flex flex-wrap align-items-center gap-1 mb-2">
-        <span class="tag-pill charity-pill" data-testid="spoiled-pill"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> Spoiled food reported</span>
+      <div v-if="fridge.openSpoiledReports || fridge.foodMayBeStale" class="d-flex flex-wrap align-items-center gap-1 mb-2">
+        <span v-if="fridge.openSpoiledReports" class="tag-pill charity-pill" data-testid="spoiled-pill"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> Spoiled food reported</span>
+        <span v-if="fridge.checking" class="tag-pill stale-pill" data-testid="checking-pill"><i class="bi bi-person-check-fill" aria-hidden="true"></i> Being checked by the Surplate team</span>
+        <span v-else-if="fridge.foodMayBeStale" class="tag-pill stale-pill" data-testid="stale-pill"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Food may not be fresh</span>
       </div>
       <p v-if="fridge.latestNote" class="fridge-note small mb-2">“{{ fridge.latestNote }}”</p>
 

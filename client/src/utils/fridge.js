@@ -8,8 +8,13 @@ export const STATUS_META = {
   low: { label: 'Running low', icon: 'bi-exclamation-circle-fill', glyph: '!' },
   empty: { label: 'Empty', icon: 'bi-x-circle-fill', glyph: '✕' },
   unknown: { label: 'No updates yet', icon: 'bi-question-circle-fill', glyph: '?' },
+  // not stored: a stocked/low fridge with no update for 48 hours (the server sends foodMayBeStale)
+  stale: { label: 'Needs a check', icon: 'bi-hourglass-split', glyph: '⌛' },
 };
 export const statusMeta = (status) => STATUS_META[status] ?? STATUS_META.unknown;
+
+/** The status to show for a fridge: "stale" replaces stocked/low when the food may be old. */
+export const displayStatus = (fridge) => (fridge.foodMayBeStale ? 'stale' : fridge.latestStatus || 'unknown');
 
 /** A status older than this is shown with a "may be out of date" hint. */
 export const STALE_MS = 24 * 60 * 60 * 1000;

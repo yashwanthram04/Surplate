@@ -13,7 +13,7 @@ import SpoiledFlagModal from '../components/SpoiledFlagModal.vue';
 import { now } from '../composables/useNow';
 import { burst, hop, spin, useSmoothScroll, vDoor, vGlare, vParallax, vReveal, vTilt, vTimeline } from '../composables/useFridgeMotion';
 import { useSession } from '../stores/session';
-import { isStale, timeAgo } from '../utils/fridge';
+import { displayStatus, isStale, timeAgo } from '../utils/fridge';
 import { formatDateTime } from '../utils/time';
 
 const props = defineProps({ id: { type: String, required: true } });
@@ -39,8 +39,8 @@ function pokeUpdateMascot(event, status) {
 }
 const flash = ref(route.query.added ? 'Thanks! The fridge is on the map. Post a status update so people know what is inside.' : route.query.updated ? 'Your changes have been saved.' : '');
 
+const SHOWN_UPDATES = 10; // only the most recent updates are listed (the server sends 10)
 const updates = ref([]);
-const nextBefore = ref(null);
 const loadingMore = ref(false);
 const updatesError = ref('');
 
@@ -52,6 +52,22 @@ const removeError = ref('');
 
 const canManage = computed(() => !!fridge.value && !!session.user && (session.isAdmin || session.user.id === fridge.value.createdBy.id));
 const stale = computed(() => !!fridge.value && fridge.value.latestUpdateAt && isStale(fridge.value.latestUpdateAt, now.value));
+const shownStatus = computed(() => (fridge.value ? displayStatus(fridge.value) : 'unknown'));
+
+// An admin says they're going to check a fridge whose food may be stale; everyone then sees it's being checked.
+const claiming = ref(false);
+const claimError = ref('');
+async function startCheck() {
+  claiming.value = true;
+  claimError.value = '';
+  try {
+    fridge.value = (await api.post(`/fridges/${props.id}/checking`)).data;
+  } catch (err) {
+    claimError.value = errorMessage(err);
+  } finally {
+    claiming.value = false;
+  }
+}
 // For the single-pin map. Rebuilt whenever `fridge` is replaced (after a new status update).
 const mapFridges = computed(() => (fridge.value ? [fridge.value] : []));
 
@@ -63,7 +79,7 @@ async function load() {
     const { data } = await api.get(`/fridges/${props.id}`);
     fridge.value = data;
     document.title = `${data.name} – Surplate`;
-    await loadUpdates(true);
+    await loadUpdates();
     if (route.query.added) setTimeout(() => confetti('stocked'), 900);
   } catch (err) {
     if (err.response?.status === 404) notFound.value = true;
@@ -74,14 +90,12 @@ async function load() {
 }
 watch(() => props.id, load, { immediate: true });
 
-async function loadUpdates(reset = false) {
+async function loadUpdates() {
   loadingMore.value = true;
   updatesError.value = '';
   try {
-    const params = reset || !nextBefore.value ? {} : { before: nextBefore.value };
-    const { data } = await api.get(`/fridges/${props.id}/updates`, { params });
-    updates.value = reset ? data.items : [...updates.value, ...data.items];
-    nextBefore.value = data.nextBefore;
+    const { data } = await api.get(`/fridges/${props.id}/updates`);
+    updates.value = data.items.slice(0, SHOWN_UPDATES);
   } catch (err) {
     updatesError.value = errorMessage(err);
   } finally {
@@ -91,8 +105,8 @@ async function loadUpdates(reset = false) {
 
 // A new status update from the form: show it at the top and refresh the headline status.
 function onPosted(update) {
-  updates.value = [update, ...updates.value];
-  fridge.value = { ...fridge.value, latestStatus: update.status, latestUpdateAt: update.createdAt, latestNote: update.note };
+  updates.value = [update, ...updates.value].slice(0, SHOWN_UPDATES);
+  fridge.value = { ...fridge.value, latestStatus: update.status, latestUpdateAt: update.createdAt, latestNote: update.note, foodMayBeStale: false, checking: null };
   flash.value = 'Thanks! The status has been updated.';
   nextTick(() => {
     confetti(update.status);
@@ -155,6 +169,26 @@ async function remove() {
         Someone reported spoiled food here and the supplier has been told. Check dates and smell before you take anything.
       </div>
 
+      <div v-if="fridge.foodMayBeStale" class="alert alert-stale mt-3 mb-0" role="status" data-testid="stale-warning">
+        <template v-if="fridge.checking">
+          <i class="bi bi-person-check-fill me-1" aria-hidden="true"></i>
+          <strong>The Surplate team is checking this fridge</strong> ({{ fridge.checking.byName }}, {{ timeAgo(fridge.checking.at, now) }}).
+          Old food may still be inside until they post an update, so check dates and smell before you take anything.
+        </template>
+        <template v-else>
+          <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
+          <strong>Food here may not be fresh.</strong> Nobody has updated this fridge in over 2 days, and the Surplate admins have been asked to check it.
+          Check dates and smell before you take anything.
+        </template>
+        <div v-if="session.isAdmin" class="mt-2">
+          <button v-if="!fridge.checking" type="button" class="btn btn-sm btn-stale" :disabled="claiming" data-testid="start-check" @click="startCheck">
+            <span v-if="claiming" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span><i v-else class="bi bi-person-check me-1" aria-hidden="true"></i>I'm checking this
+          </button>
+          <div class="small mt-1">When you're done, post a status update below (for example "Empty", cleared out old food). That clears this warning.</div>
+          <div v-if="claimError" class="text-danger small mt-1" role="alert">{{ claimError }}</div>
+        </div>
+      </div>
+
       <div class="row g-4 mt-1">
         <div class="col-12 col-lg-7">
           <div v-if="fridge.photoUrl" v-door class="fridge-media">
@@ -170,7 +204,8 @@ async function remove() {
 
           <section class="mt-4" aria-labelledby="history-title">
             <h2 id="history-title" class="h5">Status history</h2>
-            <div v-if="updatesError" class="alert alert-danger py-2" role="alert">{{ updatesError }} <button class="btn btn-sm btn-outline-danger ms-2" @click="loadUpdates(true)">Retry</button></div>
+            <p v-if="updates.length >= SHOWN_UPDATES" class="small text-body-secondary mt-n1">The {{ SHOWN_UPDATES }} most recent updates.</p>
+            <div v-if="updatesError" class="alert alert-danger py-2" role="alert">{{ updatesError }} <button class="btn btn-sm btn-outline-danger ms-2" @click="loadUpdates()">Retry</button></div>
             <p v-else-if="!updates.length && !loadingMore" class="text-body-secondary" data-testid="no-updates">Nobody has posted an update yet. Be the first!</p>
             <div v-timeline class="timeline-wrap">
             <span class="timeline-rail" aria-hidden="true"></span>
@@ -188,15 +223,12 @@ async function remove() {
                 </div>
                 <p v-if="u.note" class="mb-1 mt-2">{{ u.note }}</p>
                 <img v-if="u.photoUrl" :src="u.photoUrl" class="update-photo d-block mt-2" :alt="`Photo posted with this update by ${u.author.name}`" loading="lazy" />
-                <button v-if="session.isLoggedIn" type="button" class="btn btn-link btn-sm text-danger p-0 mt-1" data-testid="flag-update" @click="openFlag(u)">
+                <button v-if="session.isLoggedIn && u.status !== 'empty'" type="button" class="btn btn-link btn-sm text-danger p-0 mt-1" data-testid="flag-update" @click="openFlag(u)">
                   <i class="bi bi-flag me-1" aria-hidden="true"></i>Flag spoiled food from this drop-off
                 </button>
               </li>
             </ul>
             </div>
-            <button v-if="nextBefore" type="button" class="btn btn-outline-secondary btn-sm" :disabled="loadingMore" @click="loadUpdates()">
-              <span v-if="loadingMore" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Show older updates
-            </button>
           </section>
         </div>
 
@@ -204,20 +236,21 @@ async function remove() {
         <div class="col-12 col-lg-5">
           <!-- v-reveal on the wrapper so its entrance never fights the tilt on the card -->
           <div v-reveal>
-          <div ref="statusPanel" v-tilt="5" v-glare class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${fridge.latestStatus || 'unknown'}`">
+          <div ref="statusPanel" v-tilt="5" v-glare class="bg-white border rounded-4 p-4 fridge-panel status-panel" :class="`status-${shownStatus}`">
             <span class="panel-mood" aria-hidden="true">
               <template v-if="fridge.latestStatus === 'empty'"><span v-for="n in 7" :key="n" class="flake" :class="`fl${n}`">❄</span></template>
             </span>
-            <FridgeMascot ref="statusMascot" class="status-mascot" :mood="fridge.latestStatus || 'unknown'" :size="92" />
+            <FridgeMascot ref="statusMascot" class="status-mascot" :mood="shownStatus" :size="92" />
             <div class="text-body-secondary small">Community fridge</div>
             <h2 class="h3 mb-3 fridge-title" data-testid="fridge-title">{{ fridge.name }}</h2>
 
-            <FridgeStatusBadge :key="fridge.latestStatus" :status="fridge.latestStatus" large />
+            <FridgeStatusBadge :key="shownStatus" :status="shownStatus" large />
+            <div v-if="fridge.foodMayBeStale" class="small text-body-secondary mt-1">Last reported as {{ fridge.latestStatus === 'low' ? 'running low' : 'stocked' }}</div>
             <div class="small mt-2" data-testid="last-updated" :title="fridge.latestUpdateAt ? formatDateTime(fridge.latestUpdateAt) : ''">
               <template v-if="fridge.latestUpdateAt"><i class="bi bi-clock me-1" aria-hidden="true"></i>Last updated {{ timeAgo(fridge.latestUpdateAt, now) }}</template>
               <template v-else>Nobody has posted an update yet.</template>
             </div>
-            <div v-if="stale" class="small text-body-secondary mt-1"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>This is more than a day old, so it may be out of date.</div>
+            <div v-if="stale && !fridge.foodMayBeStale" class="small text-body-secondary mt-1"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>This is more than a day old, so it may be out of date.</div>
             <p v-if="fridge.latestNote" class="fridge-note mt-2 mb-0">“{{ fridge.latestNote }}”</p>
 
             <dl class="row mt-3 mb-0 small">

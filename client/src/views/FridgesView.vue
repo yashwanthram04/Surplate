@@ -12,7 +12,7 @@ import FridgeStickyBar from '../components/FridgeStickyBar.vue';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useCountUp, useScrollSkew, useSmoothScroll, vMagnetic, vReveal } from '../composables/useFridgeMotion'; // ✨ NEW
 import { useSession } from '../stores/session';
-import { FRIDGE_STATUSES, statusMeta } from '../utils/fridge';
+import { FRIDGE_STATUSES, displayStatus, statusMeta } from '../utils/fridge';
 
 const session = useSession();
 const blankFilters = () => ({ q: '', status: [], near: null, radiusKm: 5, sort: 'recent' });
@@ -102,8 +102,11 @@ function clearAll() {
 
 useSmoothScroll();
 const shownTotal = useCountUp(() => items.value.length);
-const shownStocked = useCountUp(() => items.value.filter((f) => f.latestStatus === 'stocked').length);
-const shownNeedy = useCountUp(() => items.value.filter((f) => f.latestStatus === 'low' || f.latestStatus === 'empty').length);
+// A stale fridge (stocked/low with no update for 48 hours) is not "ready": its food may be old.
+const countShown = (...statuses) => items.value.filter((f) => statuses.includes(displayStatus(f))).length;
+const shownStocked = useCountUp(() => countShown('stocked'));
+const shownNeedy = useCountUp(() => countShown('low', 'empty'));
+const shownStale = useCountUp(() => countShown('stale'));
 // once the banner has scrolled away, a slim bar with the same counts slides in under the navbar
 const heroCol = ref(null);
 const barOn = ref(false);
@@ -121,11 +124,12 @@ const barStats = computed(() => [
   { value: shownTotal.value, label: 'shown' },
   { value: shownStocked.value, label: 'ready' },
   { value: shownNeedy.value, label: 'need a refill' },
+  ...(shownStale.value ? [{ value: shownStale.value, label: 'need a check' }] : []),
 ]);
 const cardGrid = ref(null);
 useScrollSkew(cardGrid);
-// the mascot is happy when most fridges are stocked, worried when more need a refill
-const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.filter((f) => f.latestStatus === 'stocked').length >= items.value.filter((f) => f.latestStatus === 'low' || f.latestStatus === 'empty').length ? 'stocked' : 'low'));
+// The banner and sticky-bar mascot is always happy: it's the page's face. The counts beside it stay honest.
+const heroMood = 'stocked';
 </script>
 
 <template>
@@ -143,6 +147,7 @@ const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.f
           <div class="hero-stat"><strong>{{ shownTotal }}</strong><span>Fridges shown</span></div>
           <div class="hero-stat"><strong>{{ shownStocked }}</strong><span>Ready to take from</span></div>
           <div class="hero-stat"><strong>{{ shownNeedy }}</strong><span>Need a refill</span></div>
+          <div v-if="shownStale" class="hero-stat"><strong>{{ shownStale }}</strong><span>Need a check</span></div>
         </div>
       </FridgeBanner>
     </div>
@@ -176,7 +181,7 @@ const heroMood = computed(() => (!items.value.length ? 'unknown' : items.value.f
         <div class="mt-3">
           <div id="fr-status-label" class="small fw-semibold mb-1">Status</div>
           <div class="d-flex flex-wrap gap-1" role="group" aria-labelledby="fr-status-label">
-            <template v-for="s in [...FRIDGE_STATUSES, 'unknown']" :key="s">
+            <template v-for="s in [...FRIDGE_STATUSES, 'stale', 'unknown']" :key="s">
               <input :id="`fr-status-${s}`" class="btn-check chip-check" type="checkbox" :checked="filters.status.includes(s)" @change="toggleStatus(s)" />
               <label class="btn btn-outline-secondary chip" :class="`chip-${s}`" :for="`fr-status-${s}`"><i class="bi me-1" :class="statusMeta(s).icon" aria-hidden="true"></i>{{ statusMeta(s).label }}</label>
             </template>

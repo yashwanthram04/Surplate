@@ -184,7 +184,7 @@ describe('status updates', () => {
     assert.equal((await postUpdate(f.id, { status: 'low' }, ALEX)).status, 201, 'the limit is per person');
   });
 
-  test('history is paginated, newest first', async () => {
+  test('history is paginated, newest first, 10 at a time', async () => {
     const f = await (await addFridge(validFridge({ name: 'Busy fridge' }))).json();
     const { default: FridgeUpdate } = await import('../src/models/FridgeUpdate.js');
     const author = (await (await call('/auth/me', { user: ALEX })).json()).user;
@@ -193,13 +193,131 @@ describe('status updates', () => {
       fridge: f.id, author: author.id, authorName: author.name, authorRole: author.role, status: 'low', note: `update ${i}`, createdAt: new Date(base + i * 60000),
     })));
     const page1 = await (await call(`/fridges/${f.id}/updates`)).json();
-    assert.equal(page1.items.length, 20);
+    assert.equal(page1.items.length, 10);
     assert.equal(page1.items[0].note, 'update 24');
     assert.ok(page1.nextBefore);
     const page2 = await (await call(`/fridges/${f.id}/updates?before=${encodeURIComponent(page1.nextBefore)}`)).json();
-    assert.equal(page2.items.length, 5);
-    assert.equal(page2.items[0].note, 'update 4');
-    assert.equal(page2.nextBefore, null);
+    assert.equal(page2.items.length, 10);
+    assert.equal(page2.items[0].note, 'update 14');
+    const page3 = await (await call(`/fridges/${f.id}/updates?before=${encodeURIComponent(page2.nextBefore)}`)).json();
+    assert.equal(page3.items.length, 5);
+    assert.equal(page3.nextBefore, null);
+  });
+
+  test('paging never skips updates that were posted at the same moment', async () => {
+    const f = await (await addFridge(validFridge({ name: 'Same-moment fridge' }))).json();
+    const { default: FridgeUpdate } = await import('../src/models/FridgeUpdate.js');
+    const author = (await (await call('/auth/me', { user: ALEX })).json()).user;
+    const at = new Date(Date.now() - 60000);
+    await FridgeUpdate.insertMany(Array.from({ length: 25 }, (_, i) => ({
+      fridge: f.id, author: author.id, authorName: author.name, authorRole: author.role, status: 'low', note: `same ${i}`, createdAt: at,
+    })));
+    const ids = [];
+    let qs = '';
+    for (;;) {
+      const page = await (await call(`/fridges/${f.id}/updates?${qs}`)).json();
+      ids.push(...page.items.map((u) => u.id));
+      if (!page.nextBefore) break;
+      qs = `before=${encodeURIComponent(page.nextBefore)}&beforeId=${page.nextBeforeId}`;
+    }
+    assert.equal(ids.length, 25);
+    assert.equal(new Set(ids).size, 25);
+  });
+
+  test('update photos are hidden once the fridge is removed', async () => {
+    const f = await (await addFridge(validFridge({ name: 'Photo then removed' }))).json();
+    const u = await (await postUpdate(f.id, { status: 'stocked' }, ALEX, PNG)).json();
+    assert.equal((await call(u.photoUrl.replace('/api', ''))).status, 200);
+    await call(`/fridges/${f.id}`, { method: 'DELETE', user: ALEX });
+    assert.equal((await call(u.photoUrl.replace('/api', ''))).status, 404);
+  });
+});
+
+describe('stale fridges (stocked or low, no update for 48 hours)', () => {
+  const HOUR = 3600 * 1000;
+  const detail = async (id) => (await call(`/fridges/${id}`)).json();
+  const staleList = async (user = ADMIN) => (await (await call('/fridges/alerts/stale', { user })).json()).items;
+  const count = async () => (await call('/fridges/alerts/count', { user: ADMIN })).json();
+  const claim = (id, user = ADMIN) => call(`/fridges/${id}/checking`, { method: 'POST', user });
+  /** A fridge whose last update (`status`) was `hoursAgo` hours ago. */
+  async function fridgeUpdated(name, status, hoursAgo) {
+    const f = await (await addFridge(validFridge({ name }), ADMIN)).json();
+    await postUpdate(f.id, { status, note: 'Dropped off bread' }, SUNRISE);
+    const { default: Fridge } = await import('../src/models/Fridge.js');
+    await Fridge.updateOne({ _id: f.id }, { latestUpdateAt: new Date(Date.now() - hoursAgo * HOUR) }, { timestamps: false });
+    return f;
+  }
+
+  test('stocked for over 48 hours: users are warned and it no longer counts as stocked', async () => {
+    const f = await fridgeUpdated('Stale stocked fridge', 'stocked', 50);
+    const fresh = await fridgeUpdated('Fresh stocked fridge', 'stocked', 47);
+    const d = await detail(f.id);
+    assert.equal(d.foodMayBeStale, true);
+    assert.equal(d.checking, null);
+    assert.equal((await detail(fresh.id)).foodMayBeStale, false);
+
+    assert.ok(!(await names('status=stocked')).includes('Stale stocked fridge'));
+    assert.ok((await names('status=stocked')).includes('Fresh stocked fridge'));
+    assert.ok((await names('status=stale')).includes('Stale stocked fridge'));
+    assert.ok((await names('status=stale&q=stale stocked')).includes('Stale stocked fridge'), 'works with search too');
+  });
+
+  test('an empty fridge has no food to go stale', async () => {
+    const f = await fridgeUpdated('Long empty fridge', 'empty', 80);
+    assert.equal((await detail(f.id)).foodMayBeStale, false);
+    assert.ok(!(await staleList()).some((s) => s.id === f.id));
+  });
+
+  test('admins get a list and a badge count; an admin can say they are checking, and a new update clears it', async () => {
+    const f = await fridgeUpdated('Needs checking fridge', 'low', 60);
+    assert.ok((await staleList()).some((s) => s.id === f.id));
+    assert.equal((await call('/fridges/alerts/stale', { user: SUNRISE })).status, 403);
+    assert.equal((await claim(f.id, ALEX)).status, 403);
+
+    const before = await count();
+    assert.equal(before.open, before.reports + before.stale);
+    const res = await claim(f.id);
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).checking.byName, 'Surplate Admin');
+    assert.equal((await detail(f.id)).checking.byName, 'Surplate Admin', 'everyone can see it is being checked');
+    assert.equal((await count()).stale, before.stale - 1, 'a fridge being checked leaves the badge');
+
+    await postUpdate(f.id, { status: 'empty', note: 'Cleared out old food' }, ADMIN);
+    const after = await detail(f.id);
+    assert.equal(after.foodMayBeStale, false);
+    assert.equal(after.checking, null);
+    assert.ok(!(await staleList()).some((s) => s.id === f.id));
+  });
+
+  test('a check that nobody finishes lapses after 24 hours, and fresh fridges cannot be claimed', async () => {
+    const f = await fridgeUpdated('Forgotten check fridge', 'stocked', 72);
+    await claim(f.id);
+    const { default: Fridge } = await import('../src/models/Fridge.js');
+    await Fridge.updateOne({ _id: f.id }, { checkingAt: new Date(Date.now() - 25 * HOUR) }, { timestamps: false });
+    assert.equal((await detail(f.id)).checking, null);
+
+    const fresh = await fridgeUpdated('Just updated fridge', 'stocked', 1);
+    assert.equal((await claim(fresh.id)).status, 409);
+  });
+});
+
+describe('limits across all fridges', () => {
+  test('one person can only add so many fridges a day, post so many updates and send so many reports an hour', async () => {
+    const SAM = await ctx.login('sam@demo.surplate.sg');
+    const ids = [];
+    for (let i = 0; i < 10; i++) {
+      const res = await addFridge(validFridge({ name: `Sam fridge ${i}` }), SAM);
+      assert.equal(res.status, 201);
+      ids.push((await res.json()).id);
+    }
+    assert.equal((await addFridge(validFridge({ name: 'Sam fridge 11' }), SAM)).status, 429);
+    assert.equal((await addFridge(validFridge({ name: 'Admin fridge' }), ADMIN)).status, 201, 'admins are exempt');
+
+    for (const id of ids.slice(0, 3)) for (let i = 0; i < 10; i++) assert.equal((await postUpdate(id, { status: 'low' }, SAM)).status, 201);
+    assert.equal((await postUpdate(ids[3], { status: 'low' }, SAM)).status, 429, '30 an hour across fridges');
+
+    for (const id of ids.slice(0, 5)) assert.equal((await flag(id, { items: 'Old bread' }, SAM)).status, 201);
+    assert.equal((await flag(ids[5], { items: 'Old bread' }, SAM)).status, 429, '5 reports an hour across fridges');
   });
 });
 
@@ -248,6 +366,35 @@ describe('flagging spoiled food and notifying suppliers', () => {
     assert.equal(body.suppliersNotified, 0);
     assert.ok((await alerts(ADMIN)).some((r) => r.items === 'Salad (individual)'));
     assert.ok(!(await alerts(SUNRISE)).some((r) => r.items === 'Salad (individual)'));
+  });
+
+  test('a bakery that only posted "empty" made no drop-off, so it is not notified', async () => {
+    const f = await (await addFridge(validFridge({ name: 'Empty post fridge' }), ADMIN)).json(); // admin: Alex has used up today's new-fridge limit
+    const emptyPost = await (await postUpdate(f.id, { status: 'empty', note: 'Nothing left' }, SUNRISE)).json();
+    assert.equal((await (await flag(f.id, { items: 'Buns (general)' }, HOPE)).json()).suppliersNotified, 0);
+    assert.equal((await (await flag(f.id, { items: 'Buns (specific)', updateId: emptyPost.id }, ALEX)).json()).suppliersNotified, 0);
+    assert.ok(!(await alerts(SUNRISE)).some((r) => r.items.startsWith('Buns (')));
+  });
+
+  test('removing a fridge resolves its open reports, so suppliers are not left with stale alerts', async () => {
+    const f = await (await addFridge(validFridge({ name: 'Soon removed fridge' }), ADMIN)).json();
+    await postUpdate(f.id, { status: 'stocked', note: 'Dropped off muffins' }, SUNRISE);
+    const { report } = await (await flag(f.id, { items: 'Muffins (removed fridge)' }, HOPE)).json();
+    assert.ok((await alerts(SUNRISE)).some((r) => r.id === report.id));
+
+    assert.equal((await call(`/fridges/${f.id}`, { method: 'DELETE', user: ADMIN })).status, 204);
+    assert.ok(!(await alerts(SUNRISE)).some((r) => r.id === report.id));
+    const resolved = (await alerts(SUNRISE, 'resolved')).find((r) => r.id === report.id);
+    assert.equal(resolved.resolution, 'The fridge was removed from Surplate.');
+    assert.equal(resolved.resolvedByName, 'Surplate Admin');
+  });
+
+  test('renaming a fridge renames it in the alerts too', async () => {
+    const f = await (await addFridge(validFridge({ name: 'Before rename' }), ADMIN)).json();
+    await postUpdate(f.id, { status: 'stocked', note: 'Dropped off scones' }, CRUMB);
+    const { report } = await (await flag(f.id, { items: 'Scones (rename)' }, HOPE)).json();
+    assert.equal((await call(`/fridges/${f.id}`, { method: 'PUT', user: ADMIN, body: form(validFridge({ name: 'After rename' })) })).status, 200);
+    assert.equal((await alerts(CRUMB)).find((r) => r.id === report.id).fridge.name, 'After rename');
   });
 
   test('validation, login, unknown update, and duplicate reports', async () => {

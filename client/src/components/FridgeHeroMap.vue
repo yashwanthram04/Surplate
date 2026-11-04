@@ -3,7 +3,7 @@ import { gsap } from 'gsap';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { prefersReducedMotion } from '../composables/useFridgeMotion';
-import { statusMeta } from '../utils/fridge';
+import { displayStatus, statusMeta } from '../utils/fridge';
 import '../fridges.css';
 
 // A small, stylised Singapore in the banner: one glowing dot per fridge at its real location.
@@ -49,7 +49,7 @@ const dots = computed(() =>
     .filter((f) => Number.isFinite(f.lat) && Number.isFinite(f.lng))
     .map((f, i) => {
       const [x, y] = project(f.lng, f.lat);
-      const status = f.latestStatus || 'unknown';
+      const status = displayStatus(f);
       return { id: f.id, name: f.name, status, label: statusMeta(status).label, x, y, delay: `${(i % 5) * 0.55}s`, href: router.resolve({ name: 'fridge', params: { id: f.id } }).href };
     })
 );

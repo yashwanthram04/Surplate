@@ -3,7 +3,7 @@ import L from 'leaflet';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { SG_CENTER } from '../constants';
-import { statusMeta, timeAgo } from '../utils/fridge';
+import { displayStatus, statusMeta, timeAgo } from '../utils/fridge';
 import '../fridges.css';
 
 const props = defineProps({
@@ -35,8 +35,8 @@ function popupFor(f) {
   box.append(title);
 
   const status = document.createElement('div');
-  status.className = `fridge-popup-badge mt-1 status-${f.latestStatus ?? 'unknown'}`;
-  status.textContent = statusMeta(f.latestStatus).label;
+  status.className = `fridge-popup-badge mt-1 status-${displayStatus(f)}`;
+  status.textContent = statusMeta(displayStatus(f)).label;
   box.append(status);
 
   const when = document.createElement('div');
@@ -64,7 +64,7 @@ function drawFridges() {
   const fresh = props.fridges.map((f) => f.id).sort().join(',') !== lastFitKey.split('|')[0];
   let order = 0;
   for (const f of props.fridges) {
-    const status = f.latestStatus ?? 'unknown';
+    const status = displayStatus(f);
     const icon = L.divIcon({
       className: '',
       html: `<div class="pin fridge-pin status-${status}${fresh ? ' pin-in' : ''}" style="--d:${Math.min(order++, 12) * 45}ms"><span>${statusMeta(status).glyph}</span></div>`,

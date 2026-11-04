@@ -1,5 +1,19 @@
+import { CHECK_CLAIM_MS, FOOD_STALE_MS, FOOD_STATUSES } from '../models/Fridge.js';
+
 const round = (n, dp) => Math.round(n * 10 ** dp) / 10 ** dp;
 const plain = (doc) => (typeof doc.toObject === 'function' ? doc.toObject() : doc);
+
+/** True when the fridge says food is inside but nobody has updated it for FOOD_STALE_MS. */
+export const foodMayBeStale = (o, nowMs = Date.now()) =>
+  FOOD_STATUSES.includes(o.latestStatus) && !!o.latestUpdateAt && nowMs - new Date(o.latestUpdateAt).getTime() >= FOOD_STALE_MS;
+
+/** The admin check in progress, or null. It lapses after CHECK_CLAIM_MS, or as soon as someone posts an update. */
+export function activeCheck(o, nowMs = Date.now()) {
+  if (!o.checkingAt || !foodMayBeStale(o, nowMs)) return null;
+  const at = new Date(o.checkingAt).getTime();
+  if (nowMs - at >= CHECK_CLAIM_MS || at < new Date(o.latestUpdateAt).getTime()) return null;
+  return { byName: o.checkingByName, at: o.checkingAt };
+}
 
 /** Public shape of a fridge. Never includes the photo bytes. */
 export function toFridgeDTO(doc, { openSpoiledReports = 0 } = {}) {
@@ -19,6 +33,8 @@ export function toFridgeDTO(doc, { openSpoiledReports = 0 } = {}) {
     latestStatus: o.latestStatus ?? 'unknown',
     latestUpdateAt: o.latestUpdateAt ?? null,
     latestNote: o.latestNote ?? '',
+    foodMayBeStale: foodMayBeStale(o),
+    checking: activeCheck(o),
     openSpoiledReports,
     createdBy: { id: String(o.createdBy), name: o.createdByName },
     createdAt: o.createdAt,

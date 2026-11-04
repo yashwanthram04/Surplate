@@ -21,10 +21,12 @@
 .fridge-badge.status-low { background: #fff3d6; color: #7a4a00; }
 .fridge-badge.status-empty { background: #fbe3e0; color: #8f2a1f; }
 .fridge-badge.status-unknown { background: #e9ecef; color: #495057; }
+.fridge-badge.status-stale { background: #ece6f7; color: #4b2f7f; }
 .pin.fridge-pin.status-stocked { background: var(--sp-green); }
 .pin.fridge-pin.status-low { background: var(--sp-amber); }
 .pin.fridge-pin.status-empty { background: var(--sp-red); }
 .pin.fridge-pin.status-unknown { background: #6c757d; }
+.pin.fridge-pin.status-stale { background: #7b5ea7; }
 .pin.fridge-pin.is-highlighted { box-shadow: 0 0 0 4px rgba(47, 125, 79, 0.35), 0 2px 6px rgba(0, 0, 0, 0.35); }
 .fridge-popup-badge { font-weight: 600; }
 .status-choice {
@@ -53,6 +55,11 @@
 .status-low { --fc-accent: var(--sp-amber); }
 .status-empty { --fc-accent: var(--sp-red); }
 .status-unknown { --fc-accent: #adb5bd; }
+.status-stale { --fc-accent: #9b7fd1; }
+.tag-pill.stale-pill { background: #ece6f7; color: #4b2f7f; }
+.alert-stale { background: #f3effa; border: 1px solid #d6c9ef; color: #3d2768; }
+.btn-stale { background: #7b5ea7; border-color: #7b5ea7; color: #fff; }
+.btn-stale:hover, .btn-stale:focus-visible { background: #654a8f; border-color: #654a8f; color: #fff; }
 
 html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
@@ -113,6 +120,7 @@ html.fridge-route { overflow-x: clip; }
 .hm-dot.status-low { --hm: #ffcf4d; }
 .hm-dot.status-empty { --hm: #ff8a7a; }
 .hm-dot.status-unknown { --hm: #d3dbe0; }
+.hm-dot.status-stale { --hm: #cdb8f5; }
 .hm-core { fill: var(--hm); stroke: #fff; stroke-width: 1.6; transform-box: fill-box; transform-origin: center; transition: transform 0.2s cubic-bezier(0.3, 1.7, 0.5, 1); }
 .hm-dot:hover .hm-core, .hm-dot:focus-visible .hm-core { transform: scale(1.55); }
 .hm-dot:focus-visible .hm-core { stroke: #ffd66b; stroke-width: 2.4; }
@@ -294,6 +302,8 @@ html.fridge-bar-on .map-sticky.fridge-map-wrap { top: 8.6rem; height: calc(100vh
 .fridge-filters .chip-check:checked + .chip.chip-low { background: var(--sp-amber); border-color: var(--sp-amber); color: #fff; }
 .fridge-filters .chip-check:checked + .chip.chip-empty { background: var(--sp-red); border-color: var(--sp-red); color: #fff; }
 .fridge-filters .chip-check:checked + .chip.chip-unknown { background: #6c757d; border-color: #6c757d; color: #fff; }
+.fridge-filters .chip.chip-stale { --bs-btn-color: #4b2f7f; --bs-btn-border-color: #7b5ea7; --bs-btn-hover-bg: #ece6f7; --bs-btn-hover-color: #4b2f7f; --bs-btn-hover-border-color: #7b5ea7; }
+.fridge-filters .chip-check:checked + .chip.chip-stale { background: #7b5ea7; border-color: #7b5ea7; color: #fff; }
 
 .listing-card.fridge-card { border: 0; border-radius: 1.5rem; box-shadow: 0 12px 26px -16px rgba(40, 60, 40, 0.55); transition: box-shadow 0.3s; transform-style: preserve-3d; }
 .listing-card.fridge-card:hover, .listing-card.fridge-card.is-highlighted { box-shadow: 0 30px 44px -22px rgba(40, 60, 40, 0.6); transform: none; }
