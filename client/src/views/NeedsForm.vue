@@ -10,7 +10,7 @@ defineProps({
   getToday: { type: Function, required: true },
 });
 
-const emit = defineEmits(['submit', 'toggle-diet']);
+const emit = defineEmits(['submit', 'toggle-diet', 'dismiss-success']);
 </script>
 
 <template>
@@ -29,8 +29,9 @@ const emit = defineEmits(['submit', 'toggle-diet']);
       {{ formError }}
     </div>
 
-    <div v-if="successMessage" class="alert alert-success" role="status">
+    <div v-if="successMessage" class="alert alert-success alert-dismissible" role="status">
       🎉 {{ successMessage }}
+      <button type="button" class="btn-close" aria-label="Dismiss" @click="emit('dismiss-success')"></button>
     </div>
 
     <form @submit.prevent="emit('submit')">
