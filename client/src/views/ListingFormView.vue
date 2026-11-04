@@ -167,13 +167,6 @@ function toggle(list, value) {
   if (i >= 0) list.splice(i, 1);
   else list.push(value);
 }
-function setEndAfter(hours) {
-  const start = new Date(form.pickupStart);
-  const base = isNaN(start) ? new Date() : start;
-  form.pickupEnd = toLocalInput(new Date(base.getTime() + hours * 3600 * 1000));
-  touch('pickupEnd');
-}
-
 // ---- submit ----------------------------------------------------------------------------
 async function submit() {
   submitted.value = true;
@@ -300,9 +293,6 @@ async function focusFirstError() {
                 <label for="pickupEnd" class="form-label fw-semibold">Pickup closes</label>
                 <input id="pickupEnd" v-model="form.pickupEnd" type="datetime-local" class="form-control" :class="cls('pickupEnd')" :aria-invalid="!!err('pickupEnd')" aria-describedby="pickupEnd-err" />
                 <div id="pickupEnd-err" class="invalid-feedback">{{ err('pickupEnd') }}</div>
-                <div class="d-flex gap-1 mt-1" role="group" aria-label="Quick pickup length">
-                  <button v-for="h in [1, 2, 3]" :key="h" type="button" class="btn btn-sm btn-outline-secondary py-0" @click="setEndAfter(h)">+{{ h }}h</button>
-                </div>
               </div>
               <div class="col-12 col-sm-6">
                 <label for="slotMinutes" class="form-label fw-semibold">Collection slot length</label>
