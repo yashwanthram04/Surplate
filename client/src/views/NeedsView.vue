@@ -172,6 +172,26 @@ async function refreshAll() {
   await loadMyPledges();
 }
 
+// ---------- Status filter ----------
+// "Pending" = still open on the server.
+const STATUS_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'open', label: 'Pending' },
+  { value: 'fulfilled', label: 'Fulfilled' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+const statusFilter = ref('all');
+const statusCounts = computed(() => {
+  const counts = { all: needs.value.length, open: 0, fulfilled: 0, cancelled: 0 };
+  for (const need of needs.value) {
+    if (counts[need.status] !== undefined) counts[need.status] += 1;
+  }
+  return counts;
+});
+const filteredNeeds = computed(() =>
+  statusFilter.value === 'all' ? needs.value : needs.value.filter((need) => need.status === statusFilter.value),
+);
+
 // ---------- 5. Charity actions ----------
 // Tick / untick a dietary tag
 function toggleDiet(tag) {
@@ -468,6 +488,7 @@ onBeforeUnmount(() => {
         :get-today="getToday"
         @submit="createNeed"
         @toggle-diet="toggleDiet"
+        @dismiss-success="successMessage = ''"
       />
 
       <!-- Bakery only: red banner when new requests arrive -->
@@ -521,10 +542,30 @@ onBeforeUnmount(() => {
         <p class="text-body-secondary mb-0">New charity requests will appear here.</p>
       </div>
 
+      <!-- Status filter -->
+      <div v-else-if="needs.length > 0" class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Filter requests by status">
+        <button
+          v-for="f in STATUS_FILTERS"
+          :key="f.value"
+          type="button"
+          class="btn btn-sm"
+          :class="statusFilter === f.value ? 'btn-dark' : 'btn-outline-dark bg-white'"
+          :aria-pressed="statusFilter === f.value"
+          :data-testid="`needs-filter-${f.value}`"
+          @click="statusFilter = f.value"
+        >
+          {{ f.label }} ({{ statusCounts[f.value] }})
+        </button>
+      </div>
+
+      <div v-if="!loading && needs.length > 0 && filteredNeeds.length === 0" class="bg-white border rounded-4 p-4 text-center">
+        <p class="text-body-secondary mb-0">No {{ STATUS_FILTERS.find((f) => f.value === statusFilter).label.toLowerCase() }} requests.</p>
+      </div>
+
       <!-- The list of need cards -->
-      <div v-else class="row g-3">
+      <div v-if="!loading && needs.length > 0" class="row g-3">
         <div
-            v-for="need in needs"
+            v-for="need in filteredNeeds"
             :key="need.id"
             class="need-item col-12 col-lg-6"
             :data-testid="`need-${need.id}`">
