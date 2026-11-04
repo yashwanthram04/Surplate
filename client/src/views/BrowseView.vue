@@ -83,13 +83,12 @@ onBeforeUnmount(() => {
     <div class="col-12" data-enter>
       <SiteBanner icon="bi-basket2-fill">
         <BouncingHeading class="h3 mb-1" text="Rescue surplus food" />
-        <p class="text-body-secondary mb-0">Fresh leftovers from local bakeries, free to collect before the pickup window closes.</p>
+        <p class="text-body-secondary mb-0">Good food from local bakeries, free to collect.</p>
         <!-- Charities-only listings are hidden from everyone except verified charities, so say so instead of leaving people guessing -->
         <div v-if="!session.hasFullAccess" class="small text-body-secondary mt-2" data-testid="partial-view-note">
           <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-          Verified charities see more during charity priority periods. New listings open to everyone after priority ends; some older listings remain charity-only.
-          <template v-if="session.isCharity">Your charity is awaiting verification.</template>
-          <RouterLink v-else-if="!session.isLoggedIn" to="/register?role=charity">Register a charity</RouterLink>
+          Verified charities get priority access.
+          <template v-if="session.isCharity">Your verification is pending.</template>
         </div>
       </SiteBanner>
     </div>

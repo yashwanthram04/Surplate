@@ -34,6 +34,7 @@ onBeforeUnmount(() => context?.revert());
 
 <style scoped>
 .community-banner {
+  container-type: inline-size;
   position: relative;
   display: flex;
   align-items: center;
@@ -59,7 +60,7 @@ onBeforeUnmount(() => context?.revert());
 .community-banner::after { right: 50px; bottom: -220px; }
 .banner-copy { position: relative; z-index: 1; flex: 1; min-width: 0; }
 .banner-copy :deep(h1) { font-family: 'Fredoka', system-ui, sans-serif; color: #fff; }
-.banner-copy :deep(h1) { overflow-wrap: anywhere; }
+.banner-copy :deep(h1) { overflow-wrap: normal; }
 .banner-copy :deep(p), .banner-copy :deep(.text-body-secondary) { font-family: var(--bs-body-font-family); font-size: 1.05rem; font-weight: 400; line-height: 1.5; color: #ffffffeb !important; max-width: 46ch; overflow-wrap: anywhere; }
 .banner-copy :deep(a:not(.btn)) { color: #ffdf98; }
 .banner-copy :deep(p:last-child) { margin-bottom: 0; }
@@ -94,6 +95,10 @@ onBeforeUnmount(() => context?.revert());
 .is-compact .food { font-size: 22px; }
 .is-compact .apple, .is-compact .leaf, .is-compact .spark { display: none; }
 @keyframes food-float { from { transform: translateY(-4px) rotate(-5deg); } to { transform: translateY(5px) rotate(5deg); } }
+/* Give headings the full width in narrow banners, including the login card. */
+@container (max-width: 420px) {
+  .banner-art { display: none; }
+}
 @media (max-width: 575px) {
   .community-banner { gap: 12px; border-radius: 24px; }
   .banner-art { flex-basis: 58px; height: 110px; }
