@@ -8,6 +8,7 @@ const WEB_PORT = 5273;
 
 export default defineConfig({
   testDir: './e2e',
+  timeout: 60_000, // the longest journeys (a recipient, the bakery staff and a guest in one test) take ~20 s alone and slower on a busy machine
   fullyParallel: false, // tests share one database; unique data per test keeps them independent
   workers: 1,
   retries: process.env.CI ? 1 : 0,

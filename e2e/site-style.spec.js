@@ -39,10 +39,16 @@ for (const { account, routes } of [
   });
 }
 
-test('banner titles bounce by word and preserve an accessible heading', async ({ page }) => {
+test('banner titles are split into words and letters, animate in, and preserve an accessible heading', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/login');
+  // The accessible name is the real text (the split-up spans are hidden from screen readers).
   const title = page.getByRole('heading', { level: 1, name: 'Welcome back', exact: true });
   await expect(title.locator('.title-word')).toHaveCount(2);
-  await expect(title.locator('.title-word').first()).toHaveCSS('animation-name', /^title-bounce/);
+  await expect(title.locator('.title-word').first()).toHaveAttribute('aria-hidden', 'true');
+  await expect(title.locator('.ch')).toHaveCount('Welcomeback'.length);
+  // GSAP drops the letters in: while that plays, at least one letter carries an inline transform or is not yet opaque.
+  await expect
+    .poll(() => title.evaluate((h) => [...h.querySelectorAll('.ch')].some((c) => c.style.transform || (c.style.opacity !== '' && c.style.opacity !== '1'))), { timeout: 3000, intervals: [50] })
+    .toBe(true);
 });

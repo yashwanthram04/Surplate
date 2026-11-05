@@ -80,12 +80,15 @@ test.beforeAll(async ({ playwright }, testInfo) => {
   await api.dispose();
 });
 
+// Creating fridges is capped per person per day (admins are exempt), and the whole e2e run shares one database.
+// So tests that do not care who owns the fridge create it as the admin; only the owner-specific tests use a normal account.
+
 async function createFridge(page, who, name) {
   await actAs(page, who);
   const res = await page.request.post('/api/fridges', {
     multipart: { name, openingHours: '24 hours', description: 'Created by an e2e test.', address: '1 WOODLANDS SQUARE', postal: '738099', lat: '1.4370', lng: '103.7865' },
   });
-  expect(res.ok(), `create fridge as ${who}`).toBe(true);
+  expect(res.ok(), `create fridge as ${who}: ${res.status()} ${await res.text()}`).toBe(true);
   return (await res.json()).id;
 }
 async function postUpdate(page, who, fridgeId, status, note = '') {
@@ -369,7 +372,7 @@ test.describe('adding, editing and removing a fridge', () => {
 test.describe('posting a status update', () => {
   test('a bakery restocks with a note and photo, then someone reports it empty: status and last-updated change each time', async ({ page }) => {
     const name = unique('E2E status fridge');
-    const id = await createFridge(page, 'alex', name);
+    const id = await createFridge(page, 'admin', name);
 
     // 1. Sunrise Bakery drops off food and says so
     await actAs(page, 'sunrise');
@@ -413,7 +416,7 @@ test.describe('posting a status update', () => {
   });
 
   test('a status must be chosen, and a non-image photo is refused', async ({ page }) => {
-    const id = await createFridge(page, 'alex', unique('E2E invalid update fridge'));
+    const id = await createFridge(page, 'admin', unique('E2E invalid update fridge'));
     await page.goto(`/fridges/${id}`);
     const form = page.getByTestId('status-form');
 
@@ -434,7 +437,7 @@ test.describe('flagging spoiled food and notifying suppliers', () => {
   test('flagging a drop-off alerts the bakery that made it, who can resolve it', async ({ page }) => {
     const name = unique('E2E spoiled fridge');
     const item = unique('E2E mouldy loaves');
-    const id = await createFridge(page, 'alex', name);
+    const id = await createFridge(page, 'admin', name);
     await postUpdate(page, 'sunrise', id, 'stocked', '8 sourdough loaves');
     const before = await openAlertCount(page, 'sunrise');
 
@@ -495,7 +498,7 @@ test.describe('flagging spoiled food and notifying suppliers', () => {
   });
 
   test('a general flag alerts every bakery that posted at that fridge recently', async ({ page }) => {
-    const id = await createFridge(page, 'alex', unique('E2E general flag fridge'));
+    const id = await createFridge(page, 'admin', unique('E2E general flag fridge'));
     const item = unique('E2E stale pastries');
     await postUpdate(page, 'sunrise', id, 'stocked', 'Mixed pastries');
 
@@ -515,7 +518,7 @@ test.describe('flagging spoiled food and notifying suppliers', () => {
   });
 
   test('when no bakery can be matched, admins still see the report', async ({ page }) => {
-    const id = await createFridge(page, 'alex', unique('E2E unmatched fridge'));
+    const id = await createFridge(page, 'admin', unique('E2E unmatched fridge'));
     const item = unique('E2E old salad');
 
     await actAs(page, 'alex');
@@ -538,7 +541,7 @@ test.describe('flagging spoiled food and notifying suppliers', () => {
   });
 
   test('the report form needs to know what is spoiled, and stops duplicate reports', async ({ page }) => {
-    const id = await createFridge(page, 'alex', unique('E2E duplicate flag fridge'));
+    const id = await createFridge(page, 'admin', unique('E2E duplicate flag fridge'));
     await flagSpoiled(page, 'alex', id, unique('E2E first report'));
 
     await page.goto(`/fridges/${id}`);

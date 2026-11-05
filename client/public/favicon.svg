@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3c9c63"/>
+      <stop offset="1" stop-color="#1e5a39"/>
+    </linearGradient>
+    <linearGradient id="crust" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6c260"/>
+      <stop offset="1" stop-color="#d98a00"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+  <g transform="translate(32 33) scale(1.1) translate(-32 -33)">
+  <!-- the plate -->
+  <circle cx="32" cy="33" r="24" fill="#fff"/>
+  <circle cx="32" cy="33" r="18.5" fill="#e6f2ea"/>
+  <!-- a loaf on the plate -->
+  <path d="M15.5 36.5c0-8.2 7.4-14.5 16.5-14.5s16.5 6.3 16.5 14.5c0 2-1.4 3.5-3.4 3.5H18.9c-2 0-3.4-1.5-3.4-3.5z" fill="url(#crust)"/>
+  <g stroke="#a86300" stroke-width="2.4" stroke-linecap="round" fill="none">
+    <path d="M24 28.6l3.4 6.2"/>
+    <path d="M31.5 26.6l3.4 7.4"/>
+    <path d="M39 28.6l3 6"/>
+  </g>
+  </g>
+</svg>

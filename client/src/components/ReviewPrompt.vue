@@ -26,6 +26,11 @@ const next = computed(() => reviews.pending.find((p) => !dismissed.value.include
 // No banner on the wall of the bakery in question (it has its own prompt) or while the form is open.
 const show = computed(() => !!next.value && !reviews.current && route.name !== 'reservations');
 
+// While the floating toast is up, the page gets room under its last line, so a button near the bottom (Save, Submit...)
+// can always be scrolled clear of the toast instead of sitting underneath it.
+watch(show, (visible) => document.body.classList.toggle('has-thanks-toast', visible), { immediate: true });
+onBeforeUnmount(() => document.body.classList.remove('has-thanks-toast'));
+
 watch(() => session.user?.id, () => reviews.refresh(), { immediate: true });
 watch(() => route.fullPath, () => reviews.refresh());
 const timer = setInterval(() => reviews.refresh(), 120000);
