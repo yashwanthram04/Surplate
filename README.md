@@ -333,7 +333,7 @@ Stock is restored once when an eligible reservation is cancelled or released. Re
 
 ## AI assistance and attribution
 
-**AI assistance:** Codex and Claude Code were used during project development. 
+**AI assistance:** Codex and Claude Code were used during project development for design inspirations, generating different layouts and themes for the website. 
 
 **Animation libraries:** [GSAP](https://gsap.com/) powers interface and scroll animations, including ScrollTrigger, SplitText and Flip. [Lenis](https://lenis.darkroom.engineering/) provides smooth scrolling.
 
