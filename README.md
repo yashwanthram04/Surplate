@@ -2,7 +2,6 @@
 
 Surplate connects bakeries and restaurants with charities and individuals who can collect surplus food before its pickup window closes. Providers publish available food, recipients find nearby listings and reserve collection slots, and bakeries confirm each handover.
 
-Built for **IS216 Web Application Development II · Section G7 · Group 5**.
 
 **Live application:** [surplate.vercel.app](https://surplate.vercel.app)
 
