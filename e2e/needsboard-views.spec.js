@@ -1,8 +1,6 @@
 import { expect, test } from './test.js';
 
-// More Charity Needs Board journeys, next to needsboard.spec.js (which covers posting, editing, cancelling and pledging):
 // who may open the board, editing a pledge from "My Pledges", the status filters and the numbers strip.
-// Each test creates its own uniquely named requests, so tests never depend on each other or on the seed data.
 
 const EMAILS = {
   sunrise: 'sunrise@demo.surplate.sg',
@@ -202,5 +200,76 @@ test.describe('managing my pledges (bakery)', () => {
     await expect(needCard(page, id)).toContainText('2 of 5 pledged');
     await item.getByRole('button', { name: 'Cancel' }).click();
     await expect(item).toContainText('Quantity pledged: 2');
+  });
+});
+
+// ---------- Expiry - Hiding old requests ----------
+test.describe('hiding expired requests', () => {
+
+  test('hides overdue pending and fulfilled requests, and cancelled requests older than 24 hours', async ({ page }) => {
+
+    // Create requests with future deadlines
+    const pendingId = await createNeed(page, uniqueTitle('Expired pending'), 5);
+    const fulfilledId = await createNeed(page, uniqueTitle('Expired fulfilled'), 2);
+    const cancelledId = await createNeed(page, uniqueTitle('Old cancelled'), 3);
+    const recentCancelledId = await createNeed(page, uniqueTitle('Recent cancelled'), 3);
+    const futureId = await createNeed(page, uniqueTitle('Still pending'), 4);
+
+    // Fulfil one request
+    await pledgeTo(page, fulfilledId, 2);
+
+    // Cancel two requests
+    await actAs(page, 'hope');
+
+    for (const id of [cancelledId, recentCancelledId]) {
+      const response = await page.request.delete(`/api/needs/${id}`);
+      expect(response.ok()).toBe(true);
+    }
+
+    // Simulate dates that have already passed
+    const pastDeadline = new Date(
+      Date.now() - 60 * 60 * 1000
+    ).toISOString();
+
+    const oldCancellation = new Date(
+      Date.now() - 25 * 60 * 60 * 1000
+    ).toISOString();
+
+    // Change the API response dates only
+    await page.route('**/api/needs', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+
+      const response = await route.fetch();
+      const data = await response.json();
+      const items = data.items.map((need) => {
+        if (need.id === pendingId || need.id === fulfilledId) {
+          return { ...need, neededBy: pastDeadline };
+        }
+        if (need.id === cancelledId) {
+          return { ...need, cancelledAt: oldCancellation };
+        }
+        return need;
+      });
+
+      await route.fulfill({
+        response,
+        json: { ...data, items },
+      });
+    });
+
+    // Open the Charity Needs Board
+    await page.goto('/needs');
+
+    // Expired requests should not appear
+    await expect(needCard(page, pendingId)).toHaveCount(0);
+    await expect(needCard(page, fulfilledId)).toHaveCount(0);
+    await expect(needCard(page, cancelledId)).toHaveCount(0);
+
+    // Requests that are not expired should remain visible
+    await expect(needCard(page, recentCancelledId)).toBeVisible();
+    await expect(needCard(page, futureId)).toBeVisible();
   });
 });

@@ -105,12 +105,18 @@ function isValidQuantity(value) {
 const ONE_DAY = 24 * 60 * 60 * 1000;
 
 function isStillShown(need) {
-  if (need.status !== 'cancelled') return true;
+  // Cancelled: hide 24 hours after cancellation
+  if (need.status === 'cancelled') {
+    const cancelTime = new Date(need.cancelledAt ?? need.updatedAt);
+    if (Number.isNaN(cancelTime.getTime())) return true;
 
-  const cancelTime = new Date(need.cancelledAt ?? need.updatedAt);
-  if (Number.isNaN(cancelTime.getTime())) return true;
+    return Date.now() - cancelTime.getTime() < ONE_DAY;
+  }
 
-  return Date.now() - cancelTime.getTime() < ONE_DAY;
+  // Pending and fulfilled: hide after needed date/time
+  const neededTime = new Date(need.neededBy);
+  if (Number.isNaN(neededTime.getTime())) return true;
+  return Date.now() < neededTime.getTime();
 }
 
 const PIN_EMOJIS = ['🍞', '🥐', '🥖', '🥨', '🥯', '🧁'];

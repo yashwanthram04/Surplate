@@ -137,6 +137,9 @@ Only reservations confirmed as **collected** contribute to completed impact. The
 - Charities track progress and view contributing bakeries and pickup details.
 - Validation prevents pledges from exceeding remaining needs or requested quantities from falling below existing pledges.
 - New-request notifications appear in the app while the board is open.
+- Charities can edit request quantities and cancel requests. 
+- Requests can be filtered by status (Pending, Fulfilled and Cancelled)
+- Cancelled requests remain visible in a greyed-out state for 24 hours before being hidden from the board.
 
 ### 5. Reviews, Thank-you Wall and reliability
 

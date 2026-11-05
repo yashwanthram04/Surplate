@@ -41,6 +41,8 @@ export function toNeedDTO(doc, { pledges, now = new Date() } = {}) {
                 : 'open',
         createdAt: o.createdAt,
         fulfilledAt: o.fulfilledAt ?? null,
+        cancelledAt: o.cancelledAt,
+        updatedAt: o.updatedAt,
     };
     if (pledges) {
         result.pledges = pledges.map(toPledgeDTO);
