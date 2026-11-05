@@ -25,6 +25,14 @@ const clientDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 
 export function createApp() {
   const app = express();
+  // On Vercel (services mode) the platform may hand the app the path without its /api mount prefix. Put it back, so the
+  // routes below work either way. Not used anywhere else.
+  if (process.env.VERCEL) {
+    app.use((req, _res, next) => {
+      if (!/^\/api(\/|\?|$)/.test(req.url)) req.url = `/api${req.url}`;
+      next();
+    });
+  }
   app.use(express.json());
   app.use(cookieParser());
   app.use('/api', attachUser);
