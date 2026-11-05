@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cookieParser from 'cookie-parser';
 import express from 'express';
+import { jwtSecret } from './config.js';
+import { connectDb } from './db.js';
 import { attachUser } from './middleware/auth.js';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
@@ -68,4 +70,25 @@ export function createApp() {
     res.status(500).json({ error: 'Something went wrong on our side. Please try again.' });
   });
   return app;
+}
+
+// Default export for hosts that import this file and run the app themselves (Vercel). Locally, src/index.js starts the
+// server and the tests call createApp(), so this is never used there. A function instance is reused while it is warm, so
+// the database is connected once per instance and shared by every request. The one-minute "release missed pickups" timer
+// does not run here (there is no always-on process), but missed pickups are also released before the board, orders and
+// history are read, so what people see stays correct.
+let ready = null;
+let app = null;
+export default async function handleRequest(req, res) {
+  try {
+    jwtSecret(); // a clear error in the logs if JWT_SECRET is missing
+    ready ??= connectDb();
+    await ready;
+  } catch (err) {
+    ready = null; // try again on the next request
+    console.error('Could not start the API:', err);
+    return res.status(500).json({ error: 'The server is not configured correctly.' });
+  }
+  app ??= createApp();
+  return app(req, res);
 }
