@@ -86,27 +86,33 @@ Public community fridges where anyone can take or leave food. This works **indep
 | Interactive **Leaflet / OneMap** map of community fridges, pins coloured by status (green stocked, amber low, red empty, grey no updates yet), with a list beside it. Filters: status, search text, distance ("My location" or an address), sort. Anyone can browse without logging in | `FridgesView.vue`, `FridgeMap.vue`, `FridgeCard.vue` |
 | **Add or edit a fridge** (any logged-in user; the creator or an admin can edit or remove it): name, opening hours, address (OneMap type-ahead), optional photo, notes | `FridgeFormView.vue`, `server/src/utils/validateFridge.js` |
 | **Post a status update:** stocked / low / empty, with an optional note on what was dropped off and an optional photo | `FridgeStatusForm.vue`, `FridgeDetailView.vue` |
-| **Latest status and "last updated" time** on every card, map popup and detail page. The fridge keeps a copy of its newest update, so the map needs no joins. A status older than 24 hours is marked "may be out of date". The full history is on the detail page, 20 updates at a time | `FridgeStatusBadge.vue`, `server/src/routes/fridges.js` |
+| **Latest status and "last updated" time** on every card, map popup and detail page. The fridge keeps a copy of its newest update, so the map needs no joins. A status older than 24 hours is marked "may be out of date" on the detail page. The full history is on the detail page, 10 updates at a time | `FridgeStatusBadge.vue`, `server/src/routes/fridges.js` |
+| **Stale fridges:** a stocked or low fridge with no update for **48 hours** shows as "stale" ("Food may not be fresh") instead of stocked/low, and has its own map filter. An empty fridge never goes stale | `server/src/utils/serializeFridge.js`, `FridgeCard.vue` |
+| **Admin checks:** admins list stale fridges under Spoiled alerts and can mark one as "being checked"; everyone sees the claim for 24 hours or until someone posts an update. When posting the update, an admin can also resolve the fridge's open spoiled reports | `SpoiledAlertsView.vue`, `FridgeDetailView.vue` |
 | **Flag spoiled food and notify suppliers** | `SpoiledFlagModal.vue`, `SpoiledAlertsView.vue` |
 
-**How suppliers are notified.** A supplier is a bakery account. Flagging one specific drop-off notifies only the bakery that posted it. A general flag notifies every bakery that posted an update on that fridge in the last 72 hours. A report nobody can be matched to (for example, the drop-off was by an individual) is still stored and shown to admins. Bakeries see a count badge on **Spoiled alerts** in the navigation bar and can read each report (with its photo) at `/spoiled-alerts` and mark it resolved with a note. Admins see every report. The fridge page shows a warning while a report is open. Notifications are in-app only; there is no email.
+**How suppliers are notified.** A supplier is a bakery account. Flagging one specific drop-off notifies only the bakery that posted it. A general flag notifies every bakery that posted an update on that fridge in the last 72 hours. A report nobody can be matched to (for example, the drop-off was by an individual) is still stored and shown to admins. Bakeries see a count badge on **Spoiled alerts** in the navigation bar and can read each report (with its photo) at `/spoiled-alerts` and mark it resolved with a note. Admins see every report, and their badge also counts stale fridges nobody is checking yet. The fridge page shows a warning while a report is open. Notifications are in-app only; there is no email.
 
-- Posting an update or flagging food needs a login. Posts are rate-limited (10 updates per person per fridge per hour; one open spoiled report per person per fridge per hour).
+- Posting an update or flagging food needs a login. Rate limits per person: 10 updates per fridge per hour and 30 across all fridges; one open spoiled report per fridge per hour and 5 reports in total per hour; 10 new fridges per day (admins exempt).
 - Photos are JPEG, PNG or WebP up to 2 MB, checked by their file signature, stored in MongoDB and served with the same hardening headers as listing photos. Spoiled-report photos are visible only to the reporter, the notified bakeries and admins.
-- Removing a fridge is a soft delete: its history and reports are kept, like listings.
+- Removing a fridge is a soft delete: its history and reports are kept, like listings. Its open spoiled reports are resolved automatically, so bakeries aren't left with alerts for a fridge that is gone.
 - Opening hours are free text (for example "24 hours" or "Mon-Sat 8am-9pm"), not a structured schedule.
 - `server/src/models/{Fridge,FridgeUpdate,SpoiledReport}.js`, `server/src/routes/fridges.js`, `client/src/views/Fridge*View.vue`, `client/src/utils/fridge.js`
 
 | Endpoint | Access / behavior |
 |---|---|
-| `GET /api/fridges?q=&status=&lat=&lng=&radiusKm=&sort=` | Anyone; `status` is a comma list of `stocked,low,empty,unknown`; `sort` is `recent`, `distance` or `name` |
+| `GET /api/fridges?q=&status=&lat=&lng=&radiusKm=&sort=` | Anyone; `status` is a comma list of `stocked,low,empty,unknown,stale`; `sort` is `recent`, `distance` or `name` |
 | `GET /api/fridges/:id` · `GET /api/fridges/:id/photo` | Anyone |
 | `POST /api/fridges` · `PUT /api/fridges/:id` · `DELETE /api/fridges/:id` | Logged in; multipart for the photo; PUT/DELETE only by the creator or an admin |
-| `GET /api/fridges/:id/updates?before=<ISO date>` | Anyone; newest first, 20 per page; `nextBefore` is null on the last page |
-| `POST /api/fridges/:id/updates` | Logged in; multipart `status`, `note?`, `photo?` |
+| `GET /api/fridges/:id/updates?before=<ISO date>&beforeId=<update id>` | Anyone; newest first, 10 per page; `nextBefore` / `nextBeforeId` are null on the last page |
+| `GET /api/fridges/:id/updates/:updateId/photo` | Anyone, while the fridge is active |
+| `POST /api/fridges/:id/updates` | Logged in; multipart `status`, `note?`, `photo?`, `resolveReports?` (admins only; returns `reportsResolved`) |
+| `POST /api/fridges/:id/checking` | Admin; marks a stale fridge as being checked (409 if it isn't stale) |
 | `POST /api/fridges/:id/spoiled` | Logged in; multipart `items`, `note?`, `updateId?`, `photo?`; returns `suppliersNotified` |
-| `GET /api/fridges/alerts?status=open\|resolved` · `GET /api/fridges/alerts/count` | Bakery (reports sent to it) or admin (all) |
-| `POST /api/fridges/alerts/:id/resolve` | The notified bakery or an admin; JSON `{ resolution? }`; once only |
+| `GET /api/fridges/alerts?status=open\|resolved` · `GET /api/fridges/alerts/count` | Bakery (reports sent to it) or admin (all); for admins the count also returns `reports` and `stale` separately |
+| `GET /api/fridges/alerts/stale` | Admin; stale fridges, oldest update first |
+| `GET /api/fridges/alerts/:reportId/photo` | The reporter, the notified bakeries or an admin |
+| `POST /api/fridges/alerts/:reportId/resolve` | The notified bakery or an admin; JSON `{ resolution? }`; once only |
 
 ## Shared page styling
 
@@ -174,6 +180,7 @@ npm test                 # all three
 | Component | Vitest + Vue Test Utils | `client/src/components/__tests__/` (`CountdownRing`, `ListingCard`, `ListingFilters`, `StarRating`, `ThankYouNote` (stubbed stars), `ReliabilityGauge` (stubbed counter), `ThankYouTicker`), `components/home/__tests__/CountUp.spec.js`, `composables/__tests__/useMotion.spec.js` | One component in isolation: what it shows for each prop, what it emits, reduced motion and clean-up |
 | Integration | Vitest + Vue Test Utils | `components/__tests__/ListingCardIntegration.spec.js`, `views/__tests__/BrowseView.spec.js` | Card + ring on one shared clock; the browse page with the real card and filters and a mocked API (debounce, stale responses, errors, 15 s refresh, closing windows) |
 | Integration | Vitest + Vue Test Utils | `components/__tests__/ReviewModalIntegration.spec.js`, `views/__tests__/BakeryWallView.spec.js` | The thank-you form with the real star pickers, live sticky-note preview and Pinia stores (validation, posting, charity notes, server errors, editing); the Thank-you Wall with real notes and confirm dialog for a visitor, the bakery's staff (pin, reply) and a note's author (edit, delete) |
+| Unit (functions) | node:test | `client/test/fridge.test.js`, `server/test/fridgeUtils.test.js` | Fridge status labels, "time ago" and out-of-date checks; fridge, update and spoiled-report validation, photo checks and serialisation, with no database |
 | API | node:test | `server/test/*.test.js` | Every route end to end against an in-memory MongoDB |
 | End to end | Playwright | `e2e/*.spec.js` | Full user journeys in a real browser |
 
